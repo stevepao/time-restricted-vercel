@@ -16,6 +16,7 @@ import {
   type WordPressComment,
 } from "@/lib/wordpress";
 import { getWordPressOrigin } from "@/lib/wordpress-auth";
+import { rewriteWordPressBackendUrl } from "@/lib/wordpress-links";
 
 type BlogPostPageProps = {
   params: Promise<{
@@ -236,11 +237,7 @@ function sanitizePostContent(content: string): string {
       "img",
     ]),
     transformTags: {
-      a: sanitizeHtml.simpleTransform(
-        "a",
-        { rel: "noopener noreferrer" },
-        true,
-      ),
+      a: transformWordPressLink,
     },
   });
 }
@@ -253,13 +250,23 @@ function sanitizeCommentContent(content: string): string {
     allowedSchemes: ["http", "https", "mailto", "tel"],
     allowedTags: ["a", "br", "em", "p", "strong"],
     transformTags: {
-      a: sanitizeHtml.simpleTransform(
-        "a",
-        { rel: "noopener noreferrer" },
-        true,
-      ),
+      a: transformWordPressLink,
     },
   });
+}
+
+function transformWordPressLink(
+  tagName: string,
+  attribs: Record<string, string>,
+) {
+  return {
+    attribs: {
+      ...attribs,
+      href: rewriteWordPressBackendUrl(attribs.href) ?? "",
+      rel: "noopener noreferrer",
+    },
+    tagName,
+  };
 }
 
 function sanitizeInlineHtml(content: string): string {

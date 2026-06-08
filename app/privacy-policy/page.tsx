@@ -4,6 +4,7 @@ import sanitizeHtml from "sanitize-html";
 
 import { buildWordPressMetadata } from "@/lib/metadata";
 import { getPageByUri, getPageSeoByUri } from "@/lib/wordpress";
+import { rewriteWordPressBackendUrl } from "@/lib/wordpress-links";
 
 export async function generateMetadata(): Promise<Metadata> {
   const seo = await getPageSeoByUri("privacy-policy");
@@ -52,11 +53,14 @@ function sanitizePageContent(content: string): string {
     allowedSchemes: ["http", "https", "mailto", "tel"],
     allowedTags: sanitizeHtml.defaults.allowedTags.concat(["hr"]),
     transformTags: {
-      a: sanitizeHtml.simpleTransform(
-        "a",
-        { rel: "noopener noreferrer" },
-        true,
-      ),
+      a: (tagName, attribs) => ({
+        attribs: {
+          ...attribs,
+          href: rewriteWordPressBackendUrl(attribs.href) ?? "",
+          rel: "noopener noreferrer",
+        },
+        tagName,
+      }),
     },
   });
 }
