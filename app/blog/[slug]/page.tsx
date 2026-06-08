@@ -112,7 +112,7 @@ export default async function BlogPostPage({
       ) : null}
 
       <div
-        className="mt-10 space-y-6 text-[17px] leading-8 text-[#222222] [&_a]:font-medium [&_a]:text-[#1e73be] [&_a]:underline [&_a]:underline-offset-4 [&_a:hover]:text-[#222222] [&_blockquote]:border-l-4 [&_blockquote]:border-zinc-200 [&_blockquote]:bg-zinc-50 [&_blockquote]:p-5 [&_blockquote]:italic [&_h2]:pt-6 [&_h2]:text-3xl [&_h2]:font-normal [&_h2]:leading-tight [&_h3]:pt-4 [&_h3]:text-2xl [&_h3]:font-normal [&_img]:h-auto [&_img]:max-w-full [&_li]:ml-6 [&_ol]:list-decimal [&_p]:mb-6 [&_strong]:font-semibold [&_ul]:list-disc"
+        className="mt-10 space-y-6 text-[17px] leading-8 text-[#222222] [&_a]:font-medium [&_a]:text-[#1e73be] [&_a]:underline [&_a]:underline-offset-4 [&_a]:[overflow-wrap:anywhere] [&_a:hover]:text-[#222222] [&_blockquote]:border-l-4 [&_blockquote]:border-zinc-200 [&_blockquote]:bg-zinc-50 [&_blockquote]:p-5 [&_blockquote]:italic [&_h2]:pt-6 [&_h2]:text-3xl [&_h2]:font-normal [&_h2]:leading-tight [&_h3]:pt-4 [&_h3]:text-2xl [&_h3]:font-normal [&_img]:h-auto [&_img]:max-w-full [&_li]:ml-6 [&_ol]:list-decimal [&_p]:mb-6 [&_strong]:font-semibold [&_ul]:list-disc"
         dangerouslySetInnerHTML={{ __html: content }}
       />
 
@@ -217,7 +217,7 @@ function CommentItem({ comment }: { comment: WordPressComment }) {
         ) : null}
       </div>
       <div
-        className="space-y-4 text-sm leading-7 text-[#222222] [&_a]:text-[#1e73be] [&_a]:underline [&_p]:mb-4"
+        className="space-y-4 text-sm leading-7 text-[#222222] [&_a]:text-[#1e73be] [&_a]:underline [&_a]:[overflow-wrap:anywhere] [&_p]:mb-4"
         dangerouslySetInnerHTML={{
           __html: sanitizeCommentContent(comment.content ?? ""),
         }}
