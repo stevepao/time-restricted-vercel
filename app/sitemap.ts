@@ -5,7 +5,8 @@ const WORDPRESS_REST_API_URL = "https://api.time-restricted.com/wp-json/wp/v2";
 const POSTS_PER_PAGE = 100;
 
 type WordPressRestPost = {
-  modified: string;
+  modified?: string;
+  modified_gmt?: string;
   slug: string;
 };
 
@@ -21,7 +22,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...staticRoutes,
     ...posts.map((post) => ({
       changeFrequency: "weekly" as const,
-      lastModified: post.modified,
+      lastModified: toSitemapDate(post.modified_gmt ?? post.modified),
       priority: 0.7,
       url: `${FRONTEND_SITE_URL}/blog/${post.slug}`,
     })),
@@ -35,7 +36,7 @@ async function getPublishedPosts(): Promise<WordPressRestPost[]> {
 
   do {
     const response = await fetch(
-      `${WORDPRESS_REST_API_URL}/posts?per_page=${POSTS_PER_PAGE}&page=${page}&status=publish&_fields=slug,modified`,
+      `${WORDPRESS_REST_API_URL}/posts?per_page=${POSTS_PER_PAGE}&page=${page}&status=publish&_fields=slug,modified,modified_gmt`,
     );
 
     if (!response.ok) {
@@ -50,6 +51,23 @@ async function getPublishedPosts(): Promise<WordPressRestPost[]> {
   } while (page <= totalPages);
 
   return posts;
+}
+
+function toSitemapDate(value: string | undefined): Date {
+  if (!value) {
+    return new Date();
+  }
+
+  const timestamp = value.endsWith("Z") || /[+-]\d{2}:\d{2}$/.test(value)
+    ? value
+    : `${value}Z`;
+  const date = new Date(timestamp);
+
+  if (Number.isNaN(date.getTime())) {
+    return new Date();
+  }
+
+  return date;
 }
 
 async function getStaticRoutes(): Promise<MetadataRoute.Sitemap> {
