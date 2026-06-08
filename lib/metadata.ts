@@ -57,7 +57,7 @@ export function buildWordPressMetadata({
   const metadataBase = getMetadataBase();
   const title = seo?.title ?? defaultTitle;
   const description = seo?.description ?? defaultDescription;
-  const canonical = seo?.canonical ?? seo?.url ?? canonicalPath ?? "/";
+  const canonical = canonicalPath ?? seo?.canonical ?? seo?.url ?? "/";
   const canonicalUrl = toAbsoluteUrl(canonical, metadataBase);
   const openGraphTitle = seo?.openGraphTitle ?? title;
   const openGraphDescription = seo?.openGraphDescription ?? description;
