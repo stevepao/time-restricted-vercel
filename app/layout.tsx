@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Image from "next/image";
 import Link from "next/link";
+import Script from "next/script";
 import { Suspense } from "react";
 import "./globals.css";
 
@@ -48,6 +49,20 @@ export default async function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full bg-[#f7f8f9] text-[#222222]">
+        <Script id="turnstile-callback" strategy="beforeInteractive">
+          {`
+            window.onloadTurnstileCallback = function () {
+              if (window.__timeRestrictedTurnstile) {
+                window.__timeRestrictedTurnstile.renderAll();
+              }
+            };
+          `}
+        </Script>
+        <Script
+          id="cloudflare-turnstile"
+          src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onloadTurnstileCallback&render=explicit"
+          strategy="afterInteractive"
+        />
         <a
           href="#primary"
           className="absolute -left-[999px] top-auto h-px w-px overflow-hidden focus:left-4 focus:top-4 focus:z-50 focus:h-auto focus:w-auto focus:rounded-sm focus:bg-white focus:px-4 focus:py-3 focus:text-sm focus:font-semibold focus:text-[#1e73be] focus:shadow-lg"

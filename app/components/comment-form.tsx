@@ -1,35 +1,11 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
-import Script from "next/script";
+import { FormEvent, useEffect, useState } from "react";
 
-const COMMENT_LOGIN_TURNSTILE_ACTION = "comment_login";
+import { TurnstileWidget } from "@/app/components/turnstile-widget";
+
 const commentLoginTurnstileSiteKey =
   process.env.NEXT_PUBLIC_COMMENT_LOGIN_TURNSTILE_SITE_KEY;
-
-type TurnstileRenderOptions = {
-  action?: string;
-  callback?: (token: string) => void;
-  "error-callback"?: () => void;
-  "expired-callback"?: () => void;
-  sitekey: string;
-  size?: "compact" | "normal" | "flexible";
-  theme?: "auto" | "dark" | "light";
-};
-
-type TurnstileApi = {
-  render: (
-    container: HTMLElement,
-    options: TurnstileRenderOptions,
-  ) => string;
-  reset: (widgetId?: string) => void;
-};
-
-declare global {
-  interface Window {
-    turnstile?: TurnstileApi;
-  }
-}
 
 type AuthUser = {
   name: string | null;
@@ -183,53 +159,8 @@ function AuthPanel({
   onLogin: (formData: FormData) => Promise<boolean>;
   onLogout: () => void;
 }) {
-  const turnstileContainerRef = useRef<HTMLDivElement>(null);
   const [turnstileToken, setTurnstileToken] = useState("");
-  const [turnstileWidgetId, setTurnstileWidgetId] = useState<string | null>(
-    null,
-  );
-
-  const resetTurnstile = useCallback(() => {
-    setTurnstileToken("");
-
-    if (
-      turnstileWidgetId &&
-      typeof window !== "undefined" &&
-      window.turnstile
-    ) {
-      window.turnstile.reset(turnstileWidgetId);
-    }
-  }, [turnstileWidgetId]);
-
-  const renderTurnstile = useCallback(() => {
-    if (
-      !commentLoginTurnstileSiteKey ||
-      !turnstileContainerRef.current ||
-      turnstileWidgetId ||
-      typeof window === "undefined" ||
-      !window.turnstile
-    ) {
-      return;
-    }
-
-    const widgetId = window.turnstile.render(turnstileContainerRef.current, {
-      action: COMMENT_LOGIN_TURNSTILE_ACTION,
-      callback: setTurnstileToken,
-      "error-callback": () => setTurnstileToken(""),
-      "expired-callback": () => setTurnstileToken(""),
-      sitekey: commentLoginTurnstileSiteKey,
-      size: "compact",
-      theme: "auto",
-    });
-
-    setTurnstileWidgetId(widgetId);
-  }, [turnstileWidgetId]);
-
-  useEffect(() => {
-    if (!authState.loading && !authState.authenticated) {
-      renderTurnstile();
-    }
-  }, [authState.authenticated, authState.loading, renderTurnstile]);
+  const [turnstileResetSignal, setTurnstileResetSignal] = useState(0);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -237,13 +168,14 @@ function AuthPanel({
     const loginSucceeded = await onLogin(new FormData(event.currentTarget));
 
     if (!loginSucceeded) {
-      resetTurnstile();
+      setTurnstileToken("");
+      setTurnstileResetSignal((signal) => signal + 1);
     }
   }
 
   function handleLogoutClick() {
     setTurnstileToken("");
-    setTurnstileWidgetId(null);
+    setTurnstileResetSignal((signal) => signal + 1);
     onLogout();
   }
 
@@ -324,19 +256,15 @@ function AuthPanel({
           />
         </p>
         {commentLoginTurnstileSiteKey ? (
-          <>
-            <Script
-              onReady={renderTurnstile}
-              src="https://challenges.cloudflare.com/turnstile/v0/api.js"
-              strategy="afterInteractive"
-            />
-            <input
-              name="turnstileToken"
-              type="hidden"
-              value={turnstileToken}
-            />
-            <div ref={turnstileContainerRef} />
-          </>
+          <TurnstileWidget
+            action="comment_login"
+            className="turnstile-widget turnstile-widget-comment-login"
+            containerId="comment-login-turnstile-widget"
+            onTokenChange={setTurnstileToken}
+            resetSignal={turnstileResetSignal}
+            responseFieldName="turnstileToken"
+            siteKey={commentLoginTurnstileSiteKey}
+          />
         ) : null}
         <button
           className="bg-[#55555e] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#222222] disabled:cursor-not-allowed disabled:opacity-70"

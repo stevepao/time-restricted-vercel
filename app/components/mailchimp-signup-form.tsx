@@ -1,7 +1,8 @@
 "use client";
 
 import { usePathname, useSearchParams } from "next/navigation";
-import Script from "next/script";
+
+import { TurnstileWidget } from "@/app/components/turnstile-widget";
 
 const mailchimpTurnstileSiteKey =
   process.env.NEXT_PUBLIC_MAILCHIMP_TURNSTILE_SITE_KEY;
@@ -84,19 +85,12 @@ export function MailchimpSignupForm() {
         </p>
 
         {mailchimpTurnstileSiteKey ? (
-          <>
-            <Script
-              src="https://challenges.cloudflare.com/turnstile/v0/api.js"
-              strategy="afterInteractive"
-            />
-            <div
-              className="cf-turnstile"
-              data-action="mailchimp_signup"
-              data-sitekey={mailchimpTurnstileSiteKey}
-              data-size="compact"
-              data-theme="auto"
-            />
-          </>
+          <TurnstileWidget
+            action="mailchimp_signup"
+            className="turnstile-widget turnstile-widget-mailchimp"
+            containerId="mailchimp-turnstile-widget"
+            siteKey={mailchimpTurnstileSiteKey}
+          />
         ) : null}
 
         <button

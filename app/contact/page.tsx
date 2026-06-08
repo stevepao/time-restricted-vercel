@@ -1,4 +1,4 @@
-import Script from "next/script";
+import { TurnstileWidget } from "@/app/components/turnstile-widget";
 
 const contactTurnstileSiteKey =
   process.env.NEXT_PUBLIC_CONTACT_TURNSTILE_SITE_KEY;
@@ -92,19 +92,12 @@ export default async function ContactPage({ searchParams }: ContactPageProps) {
         </p>
 
         {contactTurnstileSiteKey ? (
-          <>
-            <Script
-              src="https://challenges.cloudflare.com/turnstile/v0/api.js"
-              strategy="afterInteractive"
-            />
-            <div
-              className="cf-turnstile"
-              data-action="contact_form"
-              data-sitekey={contactTurnstileSiteKey}
-              data-size="compact"
-              data-theme="auto"
-            />
-          </>
+          <TurnstileWidget
+            action="contact_form"
+            className="turnstile-widget turnstile-widget-contact"
+            containerId="contact-turnstile-widget"
+            siteKey={contactTurnstileSiteKey}
+          />
         ) : null}
 
         <button
