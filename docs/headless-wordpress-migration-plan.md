@@ -520,6 +520,66 @@ These are useful but not required for a small migrated blog:
   require external scripts.
 - Webmention or ActivityPub support if the site has IndieWeb goals.
 
+## Tips For Next Time
+
+Use this document as a structured implementation brief, not as a one-shot script.
+A similar migration has too many site-specific details to safely automate in one
+large pass: permalink structure, media host, SEO plugin output, redirect plugin
+access, webhook payload format, forms, comments, and deployment environment.
+
+Recommended Cursor workflow:
+
+1. Ask Cursor to read this plan and inspect the new repository.
+2. Have Cursor produce a site-specific checklist without editing files.
+3. Answer any unknowns about WordPress URLs, plugins, forms, comments, and
+   deployment.
+4. Implement in batches.
+5. Run `npm run lint` and `npm run build` after each batch.
+6. Commit each completed batch before moving on.
+
+Good first prompt:
+
+```text
+Read docs/headless-wordpress-migration-plan.md and inspect this repository.
+Create a site-specific implementation checklist for migrating this WordPress site
+to a Next.js App Router frontend. Do not edit files yet. Identify which parts of
+the plan apply, what environment variables are needed, and any unknowns I need
+to answer.
+```
+
+Good implementation prompts:
+
+```text
+Implement phase 1 from the checklist: WordPress API layer, core routes,
+sanitized post rendering, and basic environment documentation. Follow the
+migration plan. Keep changes scoped and run lint/build when done.
+```
+
+```text
+Implement the SEO and discovery phase from the checklist: Metadata API,
+canonical URLs, Open Graph/Twitter tags, sitemap, robots, and RSS feed. Follow
+the migration plan and verify with lint/build.
+```
+
+```text
+Implement the migration-safety phase from the checklist: internal link rewrites,
+embedded media rewrites, legacy article redirects, legacy media redirects, and
+WordPress revalidation webhook support. Follow the migration plan and verify
+with lint/build.
+```
+
+Batching the work reduces backtracking while still keeping the implementation
+safe. The plan should prevent the main traps found during this migration:
+
+- New post slugs failing because `dynamicParams = false`.
+- Social previews using backend or site-wide URLs.
+- Old dated article URLs returning 404 instead of 301.
+- Old media URLs returning 404 and hurting image search continuity.
+- Raw `img srcset` values still pointing at the old frontend host.
+- Webhook plugins being unable to put the secret token in the JSON body.
+- WordPress webhook payloads using `post.post_name` instead of `slug`.
+- Next.js 16 using `proxy.ts` rather than the older `middleware.ts` convention.
+
 ## Bottom-Up Versus Faust
 
 For a small editorial site, the bottoms-up approach is often a good fit. It
