@@ -12,6 +12,7 @@ type RevalidateRequestBody = {
   token?: unknown;
   path?: unknown;
   paths?: unknown;
+  post?: unknown;
   slug?: unknown;
   tag?: unknown;
   tags?: unknown;
@@ -19,6 +20,7 @@ type RevalidateRequestBody = {
 
 export async function POST(request: Request) {
   const body = await parseJsonBody(request);
+  const token = getRequestToken(request, body);
   const secret = process.env.REVALIDATE_SECRET;
 
   if (!secret) {
@@ -28,12 +30,12 @@ export async function POST(request: Request) {
     );
   }
 
-  if (!body || body.token !== secret) {
+  if (token !== secret) {
     return Response.json({ message: "Invalid token." }, { status: 401 });
   }
 
-  const paths = getPathsToRevalidate(body);
-  const tags = getTagsToRevalidate(body);
+  const paths = getPathsToRevalidate(body ?? {});
+  const tags = getTagsToRevalidate(body ?? {});
 
   for (const path of paths) {
     if (isDynamicRoutePattern(path)) {
@@ -53,6 +55,19 @@ export async function POST(request: Request) {
     revalidated: true,
     tags,
   });
+}
+
+function getRequestToken(
+  request: Request,
+  body: RevalidateRequestBody | null,
+): string | null {
+  const urlToken = new URL(request.url).searchParams.get("token");
+
+  if (urlToken) {
+    return urlToken;
+  }
+
+  return typeof body?.token === "string" ? body.token : null;
 }
 
 async function parseJsonBody(
@@ -89,8 +104,10 @@ function getPathsToRevalidate(body: RevalidateRequestBody): string[] {
     }
   }
 
-  if (isValidSlug(body.slug)) {
-    paths.add(`/blog/${body.slug}`);
+  const slug = getPostSlug(body);
+
+  if (slug) {
+    paths.add(`/blog/${slug}`);
   } else if (!isValidPath(body.path) && !Array.isArray(body.paths)) {
     paths.add("/blog/[slug]");
   }
@@ -120,6 +137,18 @@ function isDynamicRoutePattern(path: string): boolean {
   return path.includes("[") && path.includes("]");
 }
 
+function getPostSlug(body: RevalidateRequestBody): string | null {
+  if (isValidSlug(body.slug)) {
+    return body.slug;
+  }
+
+  if (isRecord(body.post) && isValidSlug(body.post.post_name)) {
+    return body.post.post_name;
+  }
+
+  return null;
+}
+
 function isValidSlug(slug: unknown): slug is string {
   return (
     typeof slug === "string" &&
@@ -132,4 +161,8 @@ function isValidSlug(slug: unknown): slug is string {
 
 function isValidTag(tag: unknown): tag is string {
   return typeof tag === "string" && tag.length > 0 && tag.length <= 256;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

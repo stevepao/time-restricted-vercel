@@ -106,18 +106,18 @@ WordPress account login and comments use the origin derived from `WORDPRESS_API_
 
 This app is designed for deployment on Vercel. Configure the environment variables in the Vercel project settings, then connect the repository and deploy from the selected branch.
 
-For CMS-driven refreshes, post JSON to `/api/revalidate`:
+For CMS-driven refreshes, post to `/api/revalidate?token=your-revalidate-secret`:
 
 ```json
 {
-  "token": "your-revalidate-secret",
   "slug": "example-post"
 }
 ```
 
-The revalidation endpoint also accepts a specific `path` or `paths` array. If no
-post slug or path is provided, it refreshes the main WordPress post surfaces and
-the dynamic `/blog/[slug]` route.
+The revalidation endpoint also accepts the token in the JSON body, a WordPress
+webhook payload with `post.post_name`, plus a specific `path` or `paths` array.
+If no post slug or path is provided, it refreshes the main WordPress post
+surfaces and the dynamic `/blog/[slug]` route.
 
 ## License
 
