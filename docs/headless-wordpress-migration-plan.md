@@ -201,6 +201,29 @@ Apply that transform wherever WordPress HTML is rendered:
 - Comment content.
 - WordPress-backed pages such as privacy policy.
 
+Also rewrite embedded WordPress media URLs in raw post HTML. These are separate
+from anchor links and usually appear in `img` attributes:
+
+```html
+<img src="http://example.com/wp-content/uploads/2020/01/image.jpg" />
+```
+
+The frontend should normalize media references to the WordPress backend media
+host:
+
+```text
+https://api.example.com/wp-content/uploads/2020/01/image.jpg
+```
+
+Handle both:
+
+- `img src`
+- `img srcset`
+
+This matters because raw WordPress HTML is rendered directly by the browser.
+Next.js image configuration does not rewrite image URLs inside
+`dangerouslySetInnerHTML`.
+
 ## 7. Redirects
 
 If the WordPress Redirection plugin is used, mirror those rules at the frontend

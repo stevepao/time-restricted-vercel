@@ -16,7 +16,10 @@ import {
   type WordPressComment,
 } from "@/lib/wordpress";
 import { getWordPressOrigin } from "@/lib/wordpress-auth";
-import { rewriteWordPressBackendUrl } from "@/lib/wordpress-links";
+import {
+  createWordPressImageTransform,
+  rewriteWordPressBackendUrl,
+} from "@/lib/wordpress-links";
 
 type BlogPostPageProps = {
   params: Promise<{
@@ -238,6 +241,7 @@ function sanitizePostContent(content: string): string {
     ]),
     transformTags: {
       a: transformWordPressLink,
+      img: createWordPressImageTransform(),
     },
   });
 }
