@@ -1,5 +1,8 @@
 import { cache } from "react";
 
+export const WORDPRESS_CACHE_TAG = "wordpress";
+export const WORDPRESS_POSTS_CACHE_TAG = "wordpress-posts";
+
 type GraphQLVariables = Record<string, unknown>;
 
 type GraphQLError = {
@@ -297,6 +300,7 @@ export async function wpFetch<
     headers: {
       "Content-Type": "application/json",
     },
+    next: { tags: [WORDPRESS_CACHE_TAG, WORDPRESS_POSTS_CACHE_TAG] },
     body: JSON.stringify({
       query,
       variables,
@@ -698,7 +702,9 @@ async function wpRestFetch<TData>(path: string): Promise<TData> {
   }
 
   const url = new URL(path, new URL(wordpressApiUrl).origin);
-  const response = await fetch(url);
+  const response = await fetch(url, {
+    next: { tags: [WORDPRESS_CACHE_TAG, WORDPRESS_POSTS_CACHE_TAG] },
+  });
 
   if (!response.ok) {
     throw new Error(

@@ -111,9 +111,13 @@ For CMS-driven refreshes, post JSON to `/api/revalidate`:
 ```json
 {
   "token": "your-revalidate-secret",
-  "path": "/blog/example-post"
+  "slug": "example-post"
 }
 ```
+
+The revalidation endpoint also accepts a specific `path` or `paths` array. If no
+post slug or path is provided, it refreshes the main WordPress post surfaces and
+the dynamic `/blog/[slug]` route.
 
 ## License
 
