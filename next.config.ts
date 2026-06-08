@@ -9,7 +9,17 @@ const nextConfig: NextConfig = {
         protocol: "https",
       },
       {
+        hostname: "api.time-restricted.com",
+        pathname: "/wp-content/uploads/**",
+        protocol: "https",
+      },
+      {
         hostname: "time-restricted.com",
+        pathname: "/wp-content/uploads/**",
+        protocol: "http",
+      },
+      {
+        hostname: "api.time-restricted.com",
         pathname: "/wp-content/uploads/**",
         protocol: "http",
       },
