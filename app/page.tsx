@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 
 import {
   getFeaturedPosts,
@@ -7,6 +8,7 @@ import {
   searchPosts,
   type WordPressPost,
 } from "@/lib/wordpress";
+import { buildWordPressMetadata } from "@/lib/metadata";
 
 type HomePageProps = {
   searchParams?: Promise<{
@@ -23,6 +25,27 @@ type PostListView = {
   kicker: string;
   posts: WordPressPost[];
 };
+
+type PostListMetadata = {
+  canonicalPath: string;
+  description: string;
+  heading: string;
+  kicker: string;
+};
+
+export async function generateMetadata({
+  searchParams,
+}: HomePageProps): Promise<Metadata> {
+  const params = await searchParams;
+  const view = getPostListMetadata(params ?? {});
+
+  return buildWordPressMetadata({
+    canonicalPath: view.canonicalPath,
+    defaultDescription: view.description,
+    defaultTitle: view.heading,
+    seo: null,
+  });
+}
 
 export default async function Home({ searchParams }: HomePageProps) {
   const params = await searchParams;
@@ -89,6 +112,7 @@ export default async function Home({ searchParams }: HomePageProps) {
 async function getPostListView(
   params: Awaited<NonNullable<HomePageProps["searchParams"]>>,
 ): Promise<PostListView> {
+  const metadata = getPostListMetadata(params);
   const search = getSearchParam(params.s)?.trim();
   const category = getSearchParam(params.category)?.trim();
   const yearParam = getSearchParam(params.year);
@@ -98,18 +122,14 @@ async function getPostListView(
 
   if (search) {
     return {
-      description: `Posts matching “${search}”.`,
-      heading: `Search results for “${search}”`,
-      kicker: "Search Results",
+      ...metadata,
       posts: await searchPosts(search),
     };
   }
 
   if (category) {
     return {
-      description: `Posts filed under the ${category.replaceAll("-", " ")} category.`,
-      heading: `Category: ${category.replaceAll("-", " ")}`,
-      kicker: "Category Archive",
+      ...metadata,
       posts: await getPostsByCategory(category),
     };
   }
@@ -123,19 +143,71 @@ async function getPostListView(
     month <= 12
   ) {
     return {
-      description: `Posts published during ${formatArchiveHeading(year, month)}.`,
-      heading: formatArchiveHeading(year, month),
-      kicker: "Monthly Archive",
+      ...metadata,
       posts: await getPostsByMonth(year, month),
     };
   }
 
   return {
+    ...metadata,
+    posts: await getFeaturedPosts(),
+  };
+}
+
+function getPostListMetadata(
+  params: Awaited<NonNullable<HomePageProps["searchParams"]>>,
+): PostListMetadata {
+  const search = getSearchParam(params.s)?.trim();
+  const category = getSearchParam(params.category)?.trim();
+  const yearParam = getSearchParam(params.year);
+  const monthParam = getSearchParam(params.month);
+  const year = Number(yearParam);
+  const month = Number(monthParam);
+
+  if (search) {
+    return {
+      canonicalPath: `/?s=${encodeURIComponent(search)}`,
+      description: `Posts matching “${search}”.`,
+      heading: `Search results for “${search}”`,
+      kicker: "Search Results",
+    };
+  }
+
+  if (category) {
+    const categoryLabel = category.replaceAll("-", " ");
+
+    return {
+      canonicalPath: `/?category=${encodeURIComponent(category)}`,
+      description: `Posts filed under the ${categoryLabel} category.`,
+      heading: `Category: ${categoryLabel}`,
+      kicker: "Category Archive",
+    };
+  }
+
+  if (
+    yearParam &&
+    monthParam &&
+    Number.isInteger(year) &&
+    Number.isInteger(month) &&
+    month >= 1 &&
+    month <= 12
+  ) {
+    const archiveHeading = formatArchiveHeading(year, month);
+
+    return {
+      canonicalPath: `/?year=${year}&month=${month}`,
+      description: `Posts published during ${archiveHeading}.`,
+      heading: archiveHeading,
+      kicker: "Monthly Archive",
+    };
+  }
+
+  return {
+    canonicalPath: "/",
     description:
       "Stephen Pao writes about living with Type II diabetes, chronic kidney disease, and long-term time-restricted eating.",
     heading: "Experiences with Time-Restricted Eating and Managing Chronic Disease",
     kicker: "Featured Essays",
-    posts: await getFeaturedPosts(),
   };
 }
 

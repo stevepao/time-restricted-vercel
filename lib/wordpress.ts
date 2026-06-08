@@ -1,3 +1,5 @@
+import { cache } from "react";
+
 type GraphQLVariables = Record<string, unknown>;
 
 type GraphQLError = {
@@ -15,6 +17,32 @@ export type WordPressFeaturedImage = {
     sourceUrl: string;
   } | null;
 } | null;
+
+export type WordPressSeoImage = {
+  height: number | null;
+  url: string;
+  width: number | null;
+};
+
+export type WordPressSeoData = {
+  canonical: string | null;
+  description: string | null;
+  featuredImage: WordPressSeoImage | null;
+  modifiedTime: string | null;
+  openGraphDescription: string | null;
+  openGraphImage: WordPressSeoImage | null;
+  openGraphTitle: string | null;
+  publishedTime: string | null;
+  robots: {
+    follow: boolean | null;
+    index: boolean | null;
+  } | null;
+  title: string | null;
+  twitterDescription: string | null;
+  twitterImage: WordPressSeoImage | null;
+  twitterTitle: string | null;
+  url: string | null;
+};
 
 export type WordPressPost = {
   id: string;
@@ -68,6 +96,92 @@ export type WordPressPage = {
   slug: string;
   date: string | null;
   content: string | null;
+};
+
+type RestRenderedValue = {
+  rendered?: string;
+};
+
+type RestMediaSize = {
+  height?: number;
+  source_url?: string;
+  width?: number;
+};
+
+type RestMedia = {
+  alt_text?: string;
+  media_details?: {
+    height?: number;
+    sizes?: Record<string, RestMediaSize>;
+    width?: number;
+  };
+  source_url?: string;
+};
+
+type RestSeoImage =
+  | string
+  | {
+      height?: number;
+      sourceUrl?: string;
+      source_url?: string;
+      url?: string;
+      width?: number;
+    };
+
+type RestYoastSeo = {
+  canonical?: string;
+  description?: string;
+  og_description?: string;
+  og_image?: RestSeoImage[];
+  og_title?: string;
+  og_url?: string;
+  robots?: {
+    follow?: string;
+    index?: string;
+  };
+  title?: string;
+  twitter_description?: string;
+  twitter_image?: RestSeoImage;
+  twitter_title?: string;
+};
+
+type RestRankMathSeo = {
+  canonical?: string;
+  description?: string;
+  metaDesc?: string;
+  metaDescription?: string;
+  og_description?: string;
+  og_image?: RestSeoImage | RestSeoImage[];
+  og_title?: string;
+  openGraph?: {
+    description?: string;
+    image?: RestSeoImage | RestSeoImage[];
+    title?: string;
+  };
+  robots?: string[] | string;
+  title?: string;
+  twitter?: {
+    description?: string;
+    image?: RestSeoImage | RestSeoImage[];
+    title?: string;
+  };
+  twitter_description?: string;
+  twitter_image?: RestSeoImage | RestSeoImage[];
+  twitter_title?: string;
+};
+
+type RestSeoDocument = {
+  date?: string | null;
+  featured_media?: number;
+  jetpack_featured_media_url?: string;
+  link?: string;
+  modified?: string | null;
+  rank_math_head_json?: RestRankMathSeo;
+  rank_math_seo?: RestRankMathSeo;
+  slug?: string;
+  title?: RestRenderedValue;
+  excerpt?: RestRenderedValue;
+  yoast_head_json?: RestYoastSeo;
 };
 
 export type WordPressCategory = {
@@ -526,6 +640,37 @@ export async function getPageByUri(uri: string): Promise<WordPressPage | null> {
   return null;
 }
 
+export const getPostSeoBySlug = cache(
+  async (slug: string): Promise<WordPressSeoData | null> => {
+    const posts = await wpRestFetch<RestSeoDocument[]>(
+      `/wp-json/wp/v2/posts?slug=${encodeURIComponent(slug)}`,
+    );
+    const post = posts[0];
+
+    if (!post) {
+      return null;
+    }
+
+    return mapRestSeoDocument(post);
+  },
+);
+
+export const getPageSeoByUri = cache(
+  async (uri: string): Promise<WordPressSeoData | null> => {
+    const trimmedUri = uri.replace(/^\/|\/$/g, "");
+    const pages = await wpRestFetch<RestSeoDocument[]>(
+      `/wp-json/wp/v2/pages?slug=${encodeURIComponent(trimmedUri)}`,
+    );
+    const page = pages[0];
+
+    if (!page) {
+      return null;
+    }
+
+    return mapRestSeoDocument(page);
+  },
+);
+
 async function fetchPageByUri(uri: string): Promise<WordPressPage | null> {
   const data = await wpFetch<PageByUriResponse, PageByUriVariables>(
     `
@@ -543,6 +688,247 @@ async function fetchPageByUri(uri: string): Promise<WordPressPage | null> {
   );
 
   return data.page;
+}
+
+async function wpRestFetch<TData>(path: string): Promise<TData> {
+  const wordpressApiUrl = process.env.WORDPRESS_API_URL;
+
+  if (!wordpressApiUrl) {
+    throw new Error("WORDPRESS_API_URL environment variable is not set.");
+  }
+
+  const url = new URL(path, new URL(wordpressApiUrl).origin);
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(
+      `WordPress REST request failed: ${response.status} ${response.statusText}`,
+    );
+  }
+
+  return (await response.json()) as TData;
+}
+
+async function mapRestSeoDocument(
+  document: RestSeoDocument,
+): Promise<WordPressSeoData> {
+  const yoastSeo = document.yoast_head_json ?? null;
+  const rankMathSeo = document.rank_math_head_json ?? document.rank_math_seo ?? null;
+  const featuredImage = await getRestFeaturedImage(document);
+
+  return {
+    canonical: getFirstString(yoastSeo?.canonical, rankMathSeo?.canonical),
+    description: getFirstString(
+      yoastSeo?.description,
+      rankMathSeo?.description,
+      rankMathSeo?.metaDescription,
+      rankMathSeo?.metaDesc,
+      document.excerpt?.rendered,
+    ),
+    featuredImage,
+    modifiedTime: document.modified ?? null,
+    openGraphDescription: getFirstString(
+      yoastSeo?.og_description,
+      rankMathSeo?.openGraph?.description,
+      rankMathSeo?.og_description,
+      yoastSeo?.description,
+      rankMathSeo?.description,
+      document.excerpt?.rendered,
+    ),
+    openGraphImage:
+      getSeoImage(yoastSeo?.og_image?.[0]) ??
+      getSeoImage(rankMathSeo?.openGraph?.image) ??
+      getSeoImage(rankMathSeo?.og_image) ??
+      featuredImage,
+    openGraphTitle: getFirstString(
+      yoastSeo?.og_title,
+      rankMathSeo?.openGraph?.title,
+      rankMathSeo?.og_title,
+      yoastSeo?.title,
+      rankMathSeo?.title,
+      document.title?.rendered,
+    ),
+    publishedTime: document.date ?? null,
+    robots: mapRobots(yoastSeo?.robots, rankMathSeo?.robots),
+    title: getFirstString(
+      yoastSeo?.title,
+      rankMathSeo?.title,
+      document.title?.rendered,
+    ),
+    twitterDescription: getFirstString(
+      yoastSeo?.twitter_description,
+      rankMathSeo?.twitter?.description,
+      rankMathSeo?.twitter_description,
+      yoastSeo?.og_description,
+      rankMathSeo?.openGraph?.description,
+      yoastSeo?.description,
+      rankMathSeo?.description,
+      document.excerpt?.rendered,
+    ),
+    twitterImage:
+      getSeoImage(yoastSeo?.twitter_image) ??
+      getSeoImage(rankMathSeo?.twitter?.image) ??
+      getSeoImage(rankMathSeo?.twitter_image) ??
+      getSeoImage(yoastSeo?.og_image?.[0]) ??
+      getSeoImage(rankMathSeo?.openGraph?.image) ??
+      getSeoImage(rankMathSeo?.og_image) ??
+      featuredImage,
+    twitterTitle: getFirstString(
+      yoastSeo?.twitter_title,
+      rankMathSeo?.twitter?.title,
+      rankMathSeo?.twitter_title,
+      yoastSeo?.og_title,
+      rankMathSeo?.openGraph?.title,
+      yoastSeo?.title,
+      rankMathSeo?.title,
+      document.title?.rendered,
+    ),
+    url: getFirstString(yoastSeo?.og_url, document.link),
+  };
+}
+
+async function getRestFeaturedImage(
+  document: RestSeoDocument,
+): Promise<WordPressSeoImage | null> {
+  if (document.featured_media) {
+    const media = await wpRestFetch<RestMedia>(
+      `/wp-json/wp/v2/media/${document.featured_media}?_fields=source_url,media_details`,
+    );
+    const preferredSize =
+      media.media_details?.sizes?.["featured-content-lg"] ??
+      media.media_details?.sizes?.large ??
+      media.media_details?.sizes?.full;
+    const url = preferredSize?.source_url ?? media.source_url;
+
+    if (url) {
+      return {
+        height: preferredSize?.height ?? media.media_details?.height ?? null,
+        url,
+        width: preferredSize?.width ?? media.media_details?.width ?? null,
+      };
+    }
+  }
+
+  if (document.jetpack_featured_media_url) {
+    return {
+      height: null,
+      url: document.jetpack_featured_media_url,
+      width: null,
+    };
+  }
+
+  return null;
+}
+
+function getSeoImage(
+  image: RestSeoImage | RestSeoImage[] | null | undefined,
+): WordPressSeoImage | null {
+  if (Array.isArray(image)) {
+    return getSeoImage(image[0]);
+  }
+
+  if (!image) {
+    return null;
+  }
+
+  if (typeof image === "string") {
+    return { height: null, url: image, width: null };
+  }
+
+  const url = image.url ?? image.sourceUrl ?? image.source_url;
+
+  if (!url) {
+    return null;
+  }
+
+  return {
+    height: typeof image.height === "number" ? image.height : null,
+    url,
+    width: typeof image.width === "number" ? image.width : null,
+  };
+}
+
+function mapRobots(
+  yoastRobots: RestYoastSeo["robots"] | undefined,
+  rankMathRobots: RestRankMathSeo["robots"] | undefined,
+): WordPressSeoData["robots"] {
+  if (yoastRobots) {
+    return {
+      follow:
+        yoastRobots.follow === "follow"
+          ? true
+          : yoastRobots.follow === "nofollow"
+            ? false
+            : null,
+      index:
+        yoastRobots.index === "index"
+          ? true
+          : yoastRobots.index === "noindex"
+            ? false
+            : null,
+    };
+  }
+
+  if (rankMathRobots) {
+    const robots = Array.isArray(rankMathRobots)
+      ? rankMathRobots
+      : rankMathRobots.split(",");
+
+    return {
+      follow: robots.includes("follow")
+        ? true
+        : robots.includes("nofollow")
+          ? false
+          : null,
+      index: robots.includes("index")
+        ? true
+        : robots.includes("noindex")
+          ? false
+          : null,
+    };
+  }
+
+  return null;
+}
+
+function getFirstString(...values: Array<string | null | undefined>): string | null {
+  for (const value of values) {
+    const normalized = normalizeText(value);
+
+    if (normalized) {
+      return normalized;
+    }
+  }
+
+  return null;
+}
+
+function normalizeText(value: string | null | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+
+  const decoded = decodeHtmlEntities(value.replace(/<[^>]*>/g, " "))
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return decoded || null;
+}
+
+function decodeHtmlEntities(value: string): string {
+  return value
+    .replace(/&#(\d+);/g, (_match, codePoint: string) =>
+      String.fromCodePoint(Number(codePoint)),
+    )
+    .replace(/&#x([0-9a-f]+);/gi, (_match, codePoint: string) =>
+      String.fromCodePoint(Number.parseInt(codePoint, 16)),
+    )
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&");
 }
 
 export async function getAllPostSlugs(): Promise<string[]> {

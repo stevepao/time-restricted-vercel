@@ -1,4 +1,7 @@
+import type { Metadata } from "next";
+
 import { TurnstileWidget } from "@/app/components/turnstile-widget";
+import { buildWordPressMetadata } from "@/lib/metadata";
 
 const contactTurnstileSiteKey =
   process.env.NEXT_PUBLIC_CONTACT_TURNSTILE_SITE_KEY;
@@ -11,6 +14,13 @@ const contactMessages: Record<string, string> = {
   success: "Thanks, your message has been sent.",
   "turnstile-failed": "Verification failed. Please try again.",
 };
+
+export const metadata: Metadata = buildWordPressMetadata({
+  canonicalPath: "/contact",
+  defaultDescription: "Contact Time Restricted.",
+  defaultTitle: "Contact",
+  seo: null,
+});
 
 type ContactPageProps = {
   searchParams?: Promise<{

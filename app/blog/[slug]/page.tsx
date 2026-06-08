@@ -1,15 +1,18 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import sanitizeHtml from "sanitize-html";
 
 import { CommentForm } from "@/app/components/comment-form";
 import { CommentStatusMessage } from "@/app/components/comment-status-message";
+import { buildWordPressMetadata } from "@/lib/metadata";
 import {
   getAdjacentPosts,
   getAllPostSlugs,
   getPostBySlug,
+  getPostSeoBySlug,
   type WordPressComment,
 } from "@/lib/wordpress";
 import { getWordPressOrigin } from "@/lib/wordpress-auth";
@@ -24,6 +27,25 @@ export async function generateStaticParams(): Promise<Array<{ slug: string }>> {
   const slugs = await getAllPostSlugs();
 
   return slugs.map((slug) => ({ slug }));
+}
+
+export async function generateMetadata({
+  params,
+}: BlogPostPageProps): Promise<Metadata> {
+  const { slug } = await params;
+  const seo = await getPostSeoBySlug(slug);
+
+  if (!seo) {
+    return {};
+  }
+
+  return buildWordPressMetadata({
+    canonicalPath: `/blog/${slug}`,
+    defaultDescription: seo.description ?? undefined,
+    defaultTitle: seo.title ?? "Time Restricted",
+    seo,
+    type: "article",
+  });
 }
 
 export default async function BlogPostPage({

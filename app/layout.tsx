@@ -15,6 +15,7 @@ import {
   type WordPressCategory,
   type WordPressPost,
 } from "@/lib/wordpress";
+import { buildDefaultMetadata } from "@/lib/metadata";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -26,11 +27,7 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "Time Restricted",
-  description:
-    "Experiences with Time-Restricted Eating and Managing Chronic Disease",
-};
+export const metadata: Metadata = buildDefaultMetadata();
 
 export default async function RootLayout({
   children,

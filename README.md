@@ -51,6 +51,7 @@ Open [http://localhost:3000](http://localhost:3000).
 Required for WordPress content:
 
 - `WORDPRESS_API_URL`: WPGraphQL endpoint, for example `https://time-restricted.com/graphql`.
+- `SITE_URL`: canonical public site URL used for absolute metadata and social preview URLs, for example `https://time-restricted.com`.
 
 Required for on-demand revalidation:
 

@@ -1,7 +1,20 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import sanitizeHtml from "sanitize-html";
 
-import { getPageByUri } from "@/lib/wordpress";
+import { buildWordPressMetadata } from "@/lib/metadata";
+import { getPageByUri, getPageSeoByUri } from "@/lib/wordpress";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const seo = await getPageSeoByUri("privacy-policy");
+
+  return buildWordPressMetadata({
+    canonicalPath: "/privacy-policy",
+    defaultDescription: seo?.description ?? "Privacy Policy for Time Restricted.",
+    defaultTitle: seo?.title ?? "Privacy Policy",
+    seo,
+  });
+}
 
 export default async function PrivacyPolicyPage() {
   const page = await getPageByUri("privacy-policy");

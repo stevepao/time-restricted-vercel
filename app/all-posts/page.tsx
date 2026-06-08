@@ -1,6 +1,15 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 
 import { getAllPosts } from "@/lib/wordpress";
+import { buildWordPressMetadata } from "@/lib/metadata";
+
+export const metadata: Metadata = buildWordPressMetadata({
+  canonicalPath: "/all-posts",
+  defaultDescription: "Browse all essays published on Time Restricted.",
+  defaultTitle: "All Posts",
+  seo: null,
+});
 
 export default async function AllPostsPage() {
   const posts = await getAllPosts();
