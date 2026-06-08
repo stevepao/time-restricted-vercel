@@ -20,8 +20,6 @@ type BlogPostPageProps = {
   }>;
 };
 
-export const dynamicParams = false;
-
 export async function generateStaticParams(): Promise<Array<{ slug: string }>> {
   const slugs = await getAllPostSlugs();
 
