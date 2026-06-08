@@ -1,65 +1,174 @@
-import Image from "next/image";
+import Link from "next/link";
 
-export default function Home() {
+import {
+  getFeaturedPosts,
+  getPostsByCategory,
+  getPostsByMonth,
+  searchPosts,
+  type WordPressPost,
+} from "@/lib/wordpress";
+
+type HomePageProps = {
+  searchParams?: Promise<{
+    category?: string | string[];
+    month?: string | string[];
+    s?: string | string[];
+    year?: string | string[];
+  }>;
+};
+
+type PostListView = {
+  description: string;
+  heading: string;
+  kicker: string;
+  posts: WordPressPost[];
+};
+
+export default async function Home({ searchParams }: HomePageProps) {
+  const params = await searchParams;
+  const view = await getPostListView(params ?? {});
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    <section id="latest-posts" className="bg-white p-7 shadow-sm sm:p-8">
+      <header className="mb-16">
+        <h1 className="max-w-2xl text-3xl font-normal leading-tight tracking-tight text-[#222222] sm:text-[2rem]">
+          {view.heading}
+        </h1>
+        <p className="mt-5 max-w-2xl text-sm leading-6 text-[#222222]">
+          {view.description}
+        </p>
+        <p className="mt-7 text-xs font-medium uppercase tracking-wider text-[#575760]">
+          {view.kicker}
+        </p>
+      </header>
+
+      {view.posts.length > 0 ? (
+        <div className="space-y-12">
+          {view.posts.map((post) => (
+            <article
+              key={post.id}
+              className="group border-t-4 border-[#222222] pt-4"
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+              <div className="mb-4 flex items-center justify-between text-3xl font-semibold leading-none text-[#222222]">
+                <span>{formatPostMonthDay(post.date)}</span>
+                <span>{formatPostYear(post.date)}</span>
+              </div>
+              <div className="space-y-4">
+                <h2 className="text-3xl font-bold leading-tight tracking-tight text-[#222222]">
+                  <Link
+                    href={`/blog/${post.slug}`}
+                    className="text-[#222222] no-underline transition group-hover:text-[#1e73be]"
+                    dangerouslySetInnerHTML={{ __html: post.title }}
+                  />
+                </h2>
+                {post.excerpt ? (
+                  <div
+                    className="line-clamp-3 text-sm leading-6 text-[#575760]"
+                    dangerouslySetInnerHTML={{ __html: post.excerpt }}
+                  />
+                ) : null}
+              </div>
+              <Link
+                href={`/blog/${post.slug}`}
+                className="mt-4 inline-flex items-center text-sm text-[#1e73be] underline underline-offset-4"
+              >
+                Read more
+              </Link>
+            </article>
+          ))}
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      ) : (
+        <div className="border border-dashed border-zinc-300 bg-white p-10 text-center text-[#575760]">
+          No posts have been published yet.
         </div>
-      </main>
-    </div>
+      )}
+    </section>
   );
+}
+
+async function getPostListView(
+  params: Awaited<NonNullable<HomePageProps["searchParams"]>>,
+): Promise<PostListView> {
+  const search = getSearchParam(params.s)?.trim();
+  const category = getSearchParam(params.category)?.trim();
+  const yearParam = getSearchParam(params.year);
+  const monthParam = getSearchParam(params.month);
+  const year = Number(yearParam);
+  const month = Number(monthParam);
+
+  if (search) {
+    return {
+      description: `Posts matching “${search}”.`,
+      heading: `Search results for “${search}”`,
+      kicker: "Search Results",
+      posts: await searchPosts(search),
+    };
+  }
+
+  if (category) {
+    return {
+      description: `Posts filed under the ${category.replaceAll("-", " ")} category.`,
+      heading: `Category: ${category.replaceAll("-", " ")}`,
+      kicker: "Category Archive",
+      posts: await getPostsByCategory(category),
+    };
+  }
+
+  if (
+    yearParam &&
+    monthParam &&
+    Number.isInteger(year) &&
+    Number.isInteger(month) &&
+    month >= 1 &&
+    month <= 12
+  ) {
+    return {
+      description: `Posts published during ${formatArchiveHeading(year, month)}.`,
+      heading: formatArchiveHeading(year, month),
+      kicker: "Monthly Archive",
+      posts: await getPostsByMonth(year, month),
+    };
+  }
+
+  return {
+    description:
+      "Stephen Pao writes about living with Type II diabetes, chronic kidney disease, and long-term time-restricted eating.",
+    heading: "Experiences with Time-Restricted Eating and Managing Chronic Disease",
+    kicker: "Featured Essays",
+    posts: await getFeaturedPosts(),
+  };
+}
+
+function getSearchParam(value: string | string[] | undefined): string | null {
+  if (Array.isArray(value)) {
+    return value[0] ?? null;
+  }
+
+  return value ?? null;
+}
+
+function formatArchiveHeading(year: number, month: number): string {
+  return new Intl.DateTimeFormat("en", {
+    month: "long",
+    year: "numeric",
+  }).format(new Date(year, month - 1, 1));
+}
+
+function formatPostMonthDay(date: string | null): string {
+  if (!date) {
+    return "";
+  }
+
+  const postDate = new Date(date);
+  return `${String(postDate.getMonth() + 1).padStart(2, "0")}.${String(
+    postDate.getDate(),
+  ).padStart(2, "0")}`;
+}
+
+function formatPostYear(date: string | null): string {
+  if (!date) {
+    return "";
+  }
+
+  return String(new Date(date).getFullYear());
 }
