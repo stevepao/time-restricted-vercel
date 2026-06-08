@@ -33,6 +33,12 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
+  const legacyPostRedirect = getLegacyDatedPostRedirect(request);
+
+  if (legacyPostRedirect) {
+    return NextResponse.redirect(legacyPostRedirect, 301);
+  }
+
   const redirect = await getMatchingRedirect(request);
 
   if (!redirect) {
@@ -47,6 +53,21 @@ export const config = {
     "/((?!api|_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|.*\\..*).*)",
   ],
 };
+
+function getLegacyDatedPostRedirect(request: NextRequest): URL | null {
+  const postSlug = request.nextUrl.pathname.match(
+    /^\/\d{4}\/\d{2}\/\d{2}\/([^/]+)\/?$/,
+  )?.[1];
+
+  if (!postSlug) {
+    return null;
+  }
+
+  const redirectUrl = new URL(`/blog/${postSlug}`, request.url);
+  redirectUrl.search = request.nextUrl.search;
+
+  return redirectUrl;
+}
 
 async function getMatchingRedirect(
   request: NextRequest,
