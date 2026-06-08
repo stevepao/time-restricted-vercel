@@ -24,6 +24,7 @@ const nextConfig: NextConfig = {
         protocol: "http",
       },
     ],
+    unoptimized: true,
   },
 };
 
