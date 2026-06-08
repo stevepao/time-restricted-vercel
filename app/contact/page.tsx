@@ -1,8 +1,15 @@
+import Script from "next/script";
+
+const contactTurnstileSiteKey =
+  process.env.NEXT_PUBLIC_CONTACT_TURNSTILE_SITE_KEY;
+
 const contactMessages: Record<string, string> = {
   error: "Sorry, your message could not be sent. Please try again.",
   "missing-fields": "Please fill in all required fields.",
+  "missing-turnstile": "Please complete the verification challenge.",
   "not-configured": "The contact form is not configured yet.",
   success: "Thanks, your message has been sent.",
+  "turnstile-failed": "Verification failed. Please try again.",
 };
 
 type ContactPageProps = {
@@ -26,7 +33,12 @@ export default async function ContactPage({ searchParams }: ContactPageProps) {
         <p className="mb-6 text-sm leading-6 text-[#555555]">{message}</p>
       ) : null}
 
-      <form id="contact-form" action="/api/contact" method="post" className="space-y-5">
+      <form
+        id="contact-form"
+        action="/api/contact"
+        method="post"
+        className="space-y-5"
+      >
         <p>
           <label htmlFor="name" className="mb-2 block text-xs text-[#222222]">
             Your Name (required)
@@ -78,6 +90,22 @@ export default async function ContactPage({ searchParams }: ContactPageProps) {
             className="w-full border border-zinc-100 bg-[#f7f8f9] px-3 py-2 text-sm outline-none focus:border-[#1e73be]"
           />
         </p>
+
+        {contactTurnstileSiteKey ? (
+          <>
+            <Script
+              src="https://challenges.cloudflare.com/turnstile/v0/api.js"
+              strategy="afterInteractive"
+            />
+            <div
+              className="cf-turnstile"
+              data-action="contact_form"
+              data-sitekey={contactTurnstileSiteKey}
+              data-size="compact"
+              data-theme="auto"
+            />
+          </>
+        ) : null}
 
         <button
           type="submit"

@@ -1,12 +1,18 @@
 "use client";
 
 import { usePathname, useSearchParams } from "next/navigation";
+import Script from "next/script";
+
+const mailchimpTurnstileSiteKey =
+  process.env.NEXT_PUBLIC_MAILCHIMP_TURNSTILE_SITE_KEY;
 
 const statusMessages: Record<string, string> = {
   error: "Something went wrong. Please try again.",
   "missing-email": "Please provide a valid email address.",
+  "missing-turnstile": "Please complete the verification challenge.",
   "not-configured": "Email signup is not configured yet.",
   success: "Thank you, your sign-up request was successful!",
+  "turnstile-failed": "Verification failed. Please try again.",
 };
 
 export function MailchimpSignupForm() {
@@ -76,6 +82,22 @@ export function MailchimpSignupForm() {
             className="w-full border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-[#222222] outline-none placeholder:text-[#9a9a9a] focus:border-[#1e73be]"
           />
         </p>
+
+        {mailchimpTurnstileSiteKey ? (
+          <>
+            <Script
+              src="https://challenges.cloudflare.com/turnstile/v0/api.js"
+              strategy="afterInteractive"
+            />
+            <div
+              className="cf-turnstile"
+              data-action="mailchimp_signup"
+              data-sitekey={mailchimpTurnstileSiteKey}
+              data-size="compact"
+              data-theme="auto"
+            />
+          </>
+        ) : null}
 
         <button
           type="submit"

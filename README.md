@@ -60,6 +60,8 @@ Required for Mailchimp signup:
 
 - `MAILCHIMP_API_KEY`: Mailchimp API key including datacenter suffix.
 - `MAILCHIMP_LIST_ID`: Mailchimp audience/list ID.
+- `NEXT_PUBLIC_MAILCHIMP_TURNSTILE_SITE_KEY`: public Cloudflare Turnstile site key for the signup widget.
+- `MAILCHIMP_TURNSTILE_SECRET_KEY`: server-side Cloudflare Turnstile secret key for signup verification.
 
 Required for the contact form:
 
@@ -70,6 +72,13 @@ Required for the contact form:
 - `SMTP_FROM`: optional sender address. Defaults to `SMTP_USER`.
 - `CONTACT_TO`: optional recipient address. Defaults to `SMTP_USER`.
 - `SMTP_SECURE`: optional. Set to `true` for implicit TLS, or use port `465`.
+- `NEXT_PUBLIC_CONTACT_TURNSTILE_SITE_KEY`: public Cloudflare Turnstile site key for the contact form.
+- `CONTACT_TURNSTILE_SECRET_KEY`: server-side Cloudflare Turnstile secret key for contact verification.
+
+Required for WordPress account login before commenting:
+
+- `NEXT_PUBLIC_COMMENT_LOGIN_TURNSTILE_SITE_KEY`: public Cloudflare Turnstile site key for the comment login form.
+- `COMMENT_LOGIN_TURNSTILE_SECRET_KEY`: server-side Cloudflare Turnstile secret key for comment login verification.
 
 WordPress account login and comments use the origin derived from `WORDPRESS_API_URL` and expect compatible WordPress JWT authentication endpoints:
 

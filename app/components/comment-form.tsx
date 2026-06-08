@@ -1,6 +1,35 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import Script from "next/script";
+
+const COMMENT_LOGIN_TURNSTILE_ACTION = "comment_login";
+const commentLoginTurnstileSiteKey =
+  process.env.NEXT_PUBLIC_COMMENT_LOGIN_TURNSTILE_SITE_KEY;
+
+type TurnstileRenderOptions = {
+  action?: string;
+  callback?: (token: string) => void;
+  "error-callback"?: () => void;
+  "expired-callback"?: () => void;
+  sitekey: string;
+  size?: "compact" | "normal" | "flexible";
+  theme?: "auto" | "dark" | "light";
+};
+
+type TurnstileApi = {
+  render: (
+    container: HTMLElement,
+    options: TurnstileRenderOptions,
+  ) => string;
+  reset: (widgetId?: string) => void;
+};
+
+declare global {
+  interface Window {
+    turnstile?: TurnstileApi;
+  }
+}
 
 type AuthUser = {
   name: string | null;
@@ -53,15 +82,14 @@ export function CommentForm({
     });
   }
 
-  async function handleLogin(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function handleLogin(formData: FormData): Promise<boolean> {
     setLoginPending(true);
     setLoginMessage(null);
 
-    const formData = new FormData(event.currentTarget);
     const response = await fetch("/api/auth/login", {
       body: JSON.stringify({
         password: formData.get("password"),
+        turnstileToken: formData.get("turnstileToken"),
         username: formData.get("username"),
       }),
       credentials: "same-origin",
@@ -78,11 +106,12 @@ export function CommentForm({
 
     if (!response.ok) {
       setLoginMessage(body?.message || "WordPress login failed.");
-      return;
+      return false;
     }
 
     setLoginMessage("You are logged in.");
     await refreshAuthState();
+    return true;
   }
 
   async function handleLogout() {
@@ -151,9 +180,73 @@ function AuthPanel({
   createAccountUrl: string | null;
   loginMessage: string | null;
   loginPending: boolean;
-  onLogin: (event: FormEvent<HTMLFormElement>) => void;
+  onLogin: (formData: FormData) => Promise<boolean>;
   onLogout: () => void;
 }) {
+  const turnstileContainerRef = useRef<HTMLDivElement>(null);
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const [turnstileWidgetId, setTurnstileWidgetId] = useState<string | null>(
+    null,
+  );
+
+  const resetTurnstile = useCallback(() => {
+    setTurnstileToken("");
+
+    if (
+      turnstileWidgetId &&
+      typeof window !== "undefined" &&
+      window.turnstile
+    ) {
+      window.turnstile.reset(turnstileWidgetId);
+    }
+  }, [turnstileWidgetId]);
+
+  const renderTurnstile = useCallback(() => {
+    if (
+      !commentLoginTurnstileSiteKey ||
+      !turnstileContainerRef.current ||
+      turnstileWidgetId ||
+      typeof window === "undefined" ||
+      !window.turnstile
+    ) {
+      return;
+    }
+
+    const widgetId = window.turnstile.render(turnstileContainerRef.current, {
+      action: COMMENT_LOGIN_TURNSTILE_ACTION,
+      callback: setTurnstileToken,
+      "error-callback": () => setTurnstileToken(""),
+      "expired-callback": () => setTurnstileToken(""),
+      sitekey: commentLoginTurnstileSiteKey,
+      size: "compact",
+      theme: "auto",
+    });
+
+    setTurnstileWidgetId(widgetId);
+  }, [turnstileWidgetId]);
+
+  useEffect(() => {
+    if (!authState.loading && !authState.authenticated) {
+      renderTurnstile();
+    }
+  }, [authState.authenticated, authState.loading, renderTurnstile]);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const loginSucceeded = await onLogin(new FormData(event.currentTarget));
+
+    if (!loginSucceeded) {
+      resetTurnstile();
+    }
+  }
+
+  function handleLogoutClick() {
+    setTurnstileToken("");
+    setTurnstileWidgetId(null);
+    onLogout();
+  }
+
   if (authState.loading) {
     return <p className="text-sm text-[#555555]">Checking WordPress login...</p>;
   }
@@ -170,7 +263,7 @@ function AuthPanel({
         </p>
         <button
           className="mt-3 text-[#1e73be] underline underline-offset-4 transition hover:text-[#222222]"
-          onClick={onLogout}
+          onClick={handleLogoutClick}
           type="button"
         >
           Log out
@@ -199,7 +292,7 @@ function AuthPanel({
           Create a WordPress login
         </a>
       ) : null}
-      <form className="mt-4 space-y-3" onSubmit={onLogin}>
+      <form className="mt-4 space-y-3" onSubmit={handleSubmit}>
         <p>
           <label
             className="mb-1 block text-xs text-[#222222]"
@@ -230,9 +323,27 @@ function AuthPanel({
             type="password"
           />
         </p>
+        {commentLoginTurnstileSiteKey ? (
+          <>
+            <Script
+              onReady={renderTurnstile}
+              src="https://challenges.cloudflare.com/turnstile/v0/api.js"
+              strategy="afterInteractive"
+            />
+            <input
+              name="turnstileToken"
+              type="hidden"
+              value={turnstileToken}
+            />
+            <div ref={turnstileContainerRef} />
+          </>
+        ) : null}
         <button
           className="bg-[#55555e] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#222222] disabled:cursor-not-allowed disabled:opacity-70"
-          disabled={loginPending}
+          disabled={
+            loginPending ||
+            Boolean(commentLoginTurnstileSiteKey && !turnstileToken)
+          }
           type="submit"
         >
           {loginPending ? "Logging in..." : "Log In"}
