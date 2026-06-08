@@ -249,7 +249,7 @@ Implementation behavior:
 - Cache the redirect list.
 - Match GET/HEAD frontend requests.
 - Exclude API routes, static assets, image routes, `robots.txt`, `sitemap.xml`,
-  and file-like URLs.
+  and most file-like URLs.
 - Support common Redirection plugin fields:
   - `match_url`
   - `url`
@@ -261,6 +261,40 @@ Implementation behavior:
   - `match_data.source.flag_regex`
 - Map absolute WordPress targets back to frontend URLs.
 - Avoid redirect loops.
+
+Add built-in SEO-preserving redirects for URL patterns that are part of the
+WordPress migration, even if they are not explicitly listed in the Redirection
+plugin.
+
+Legacy dated article URLs should permanently redirect to the new frontend post
+route:
+
+```text
+/YYYY/MM/DD/post-slug/ -> /blog/post-slug
+```
+
+For example:
+
+```text
+https://www.example.com/2018/11/02/post-slug/
+https://www.example.com/blog/post-slug
+```
+
+This should be a `301`, preserve query strings, and avoid redirect chains. These
+redirects are important because search engines use them to transfer ranking
+signals from old indexed article URLs to the new canonical article URLs.
+
+Legacy media URLs should also permanently redirect so Google Image Search and
+other image indexes do not hit 404s:
+
+```text
+https://www.example.com/wp-content/uploads/2020/01/image.jpg
+https://api.example.com/wp-content/uploads/2020/01/image.jpg
+```
+
+Because upload URLs look like static files, make sure the proxy matcher includes
+`/wp-content/uploads/:path*` explicitly. A broad "skip file-like URLs" matcher
+will otherwise bypass the proxy and let old indexed image URLs 404.
 
 ## 8. Revalidation Webhooks
 
@@ -454,6 +488,8 @@ Spot-check before launch:
 - Individual post pages render.
 - New/unbuilt post slugs can render.
 - Old dated links inside article content rewrite to `/blog/[slug]`.
+- Old dated article URLs 301 to `/blog/[slug]`.
+- Old `/wp-content/uploads/...` image URLs 301 to the backend media host.
 - Redirection plugin rules redirect correctly.
 - `/sitemap.xml` contains frontend URLs.
 - `/robots.txt` points to the sitemap.
