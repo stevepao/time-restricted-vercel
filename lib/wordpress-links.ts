@@ -54,25 +54,40 @@ export function rewriteWordPressBackendUrl(
   const frontendOrigin = normalizeOrigin(
     options.frontendOrigin ?? getFrontendOrigin(),
   );
-
-  if (!href.includes(backendOrigin)) {
-    return href;
-  }
+  const isRelativeUrl = href.startsWith("/");
 
   try {
-    const url = new URL(href);
+    const url = new URL(href, frontendOrigin);
+    const urlOrigin = normalizeOrigin(url.origin);
+    const isWordPressBackendUrl = urlOrigin === backendOrigin;
+    const isFrontendUrl = urlOrigin === frontendOrigin;
 
-    if (normalizeOrigin(url.origin) !== backendOrigin) {
+    if (!isWordPressBackendUrl && !isFrontendUrl) {
       return href;
     }
 
-    const rewrittenUrl = new URL(
-      url.toString().replace(backendOrigin, frontendOrigin),
-    );
-    rewrittenUrl.pathname = getFrontendPath(url.pathname);
+    const frontendPath = isWordPressBackendUrl
+      ? getFrontendPath(url.pathname)
+      : getDatedPostPath(url.pathname);
 
-    return rewrittenUrl.toString();
+    if (!frontendPath) {
+      return href;
+    }
+
+    const rewrittenUrl = new URL(url.toString());
+    const frontendUrl = new URL(frontendOrigin);
+    rewrittenUrl.protocol = frontendUrl.protocol;
+    rewrittenUrl.host = frontendUrl.host;
+    rewrittenUrl.pathname = frontendPath;
+
+    return isRelativeUrl
+      ? `${rewrittenUrl.pathname}${rewrittenUrl.search}${rewrittenUrl.hash}`
+      : rewrittenUrl.toString();
   } catch {
+    if (!href.includes(backendOrigin)) {
+      return href;
+    }
+
     return href.replaceAll(backendOrigin, frontendOrigin);
   }
 }
@@ -96,10 +111,10 @@ function getFrontendOrigin(): string {
 }
 
 function getFrontendPath(pathname: string): string {
-  const postSlug = pathname.match(/^\/\d{4}\/\d{2}\/\d{2}\/([^/]+)\/?$/)?.[1];
+  const datedPostPath = getDatedPostPath(pathname);
 
-  if (postSlug) {
-    return `/blog/${postSlug}`;
+  if (datedPostPath) {
+    return datedPostPath;
   }
 
   if (pathname !== "/" && pathname.endsWith("/")) {
@@ -107,6 +122,12 @@ function getFrontendPath(pathname: string): string {
   }
 
   return pathname;
+}
+
+function getDatedPostPath(pathname: string): string | null {
+  const postSlug = pathname.match(/^\/\d{4}\/\d{2}\/\d{2}\/([^/]+)\/?$/)?.[1];
+
+  return postSlug ? `/blog/${postSlug}` : null;
 }
 
 function normalizeOrigin(origin: string): string {
