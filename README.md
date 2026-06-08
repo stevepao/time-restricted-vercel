@@ -9,6 +9,7 @@ Time Restricted is a headless Next.js site for essays about time-restricted eati
 - Authenticated commenting through WordPress JWT auth and the WordPress REST API.
 - Sidebar recent posts, archives, categories, author bio, and Mailchimp signup.
 - Contact form delivery through SMTP with Nodemailer.
+- RSS feed at `/feed.xml`.
 - Privacy policy page loaded from WordPress page content.
 - On-demand path revalidation endpoint for CMS or deployment hooks.
 

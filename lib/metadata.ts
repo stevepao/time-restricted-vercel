@@ -26,6 +26,11 @@ export function buildDefaultMetadata(): Metadata {
   const metadataBase = getMetadataBase();
 
   return {
+    alternates: {
+      types: {
+        "application/rss+xml": "/feed.xml",
+      },
+    },
     description: DEFAULT_DESCRIPTION,
     metadataBase,
     openGraph: {
