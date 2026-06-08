@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 const REDIRECTION_ENDPOINT_PATH = "/wp-json/redirection/v1/redirect";
 const DEFAULT_CACHE_TTL_SECONDS = 300;
+const DEFAULT_WORDPRESS_MEDIA_ORIGIN = "https://api.time-restricted.com";
 const MAX_REDIRECT_PAGES = 20;
 const REDIRECTS_PER_PAGE = 100;
 
@@ -33,6 +34,12 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
+  const legacyMediaRedirect = getLegacyMediaRedirect(request);
+
+  if (legacyMediaRedirect) {
+    return NextResponse.redirect(legacyMediaRedirect, 301);
+  }
+
   const legacyPostRedirect = getLegacyDatedPostRedirect(request);
 
   if (legacyPostRedirect) {
@@ -50,9 +57,28 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
+    "/wp-content/uploads/:path*",
     "/((?!api|_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|.*\\..*).*)",
   ],
 };
+
+function getLegacyMediaRedirect(request: NextRequest): URL | null {
+  if (!request.nextUrl.pathname.startsWith("/wp-content/uploads/")) {
+    return null;
+  }
+
+  const redirectUrl = new URL(
+    request.nextUrl.pathname,
+    getWordPressMediaOrigin(request),
+  );
+  redirectUrl.search = request.nextUrl.search;
+
+  if (redirectUrl.origin === request.nextUrl.origin) {
+    return null;
+  }
+
+  return redirectUrl;
+}
 
 function getLegacyDatedPostRedirect(request: NextRequest): URL | null {
   const postSlug = request.nextUrl.pathname.match(
@@ -462,6 +488,16 @@ function getWordPressOrigin(): string | null {
   }
 
   return new URL(wordpressApiUrl).origin;
+}
+
+function getWordPressMediaOrigin(request: NextRequest): string {
+  const wordpressOrigin = getWordPressOrigin();
+
+  if (wordpressOrigin && wordpressOrigin !== request.nextUrl.origin) {
+    return wordpressOrigin;
+  }
+
+  return DEFAULT_WORDPRESS_MEDIA_ORIGIN;
 }
 
 function getFrontendOrigin(request: NextRequest): string {
