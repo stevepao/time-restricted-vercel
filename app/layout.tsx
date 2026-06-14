@@ -7,6 +7,7 @@ import { Suspense } from "react";
 import "./globals.css";
 
 import { MailchimpSignupForm } from "@/app/components/mailchimp-signup-form";
+import { buildSiteStructuredData } from "@/lib/structured-data";
 import {
   getArchiveMonths,
   getCategories,
@@ -39,6 +40,7 @@ export default async function RootLayout({
     getSidebarArchiveMonths(),
     getSidebarCategories(),
   ]);
+  const structuredData = buildSiteStructuredData();
 
   return (
     <html
@@ -59,6 +61,10 @@ export default async function RootLayout({
           id="cloudflare-turnstile"
           src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onloadTurnstileCallback&render=explicit"
           strategy="afterInteractive"
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: structuredData }}
         />
         <a
           href="#primary"
