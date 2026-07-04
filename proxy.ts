@@ -5,6 +5,12 @@ const DEFAULT_CACHE_TTL_SECONDS = 300;
 const DEFAULT_WORDPRESS_MEDIA_ORIGIN = "https://api.time-restricted.com";
 const MAX_REDIRECT_PAGES = 20;
 const REDIRECTS_PER_PAGE = 100;
+const LEGACY_PATH_REDIRECTS: Record<string, string> = {
+  "/all-posts-old": "/all-posts",
+  "/home": "/",
+  "/posts": "/all-posts",
+  "/sitemap.html": "/sitemap.xml",
+};
 
 type RedirectStatusCode = 301 | 302 | 303 | 307 | 308;
 
@@ -46,6 +52,12 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(legacyPostRedirect, 301);
   }
 
+  const legacyPathRedirect = getLegacyPathRedirect(request);
+
+  if (legacyPathRedirect) {
+    return NextResponse.redirect(legacyPathRedirect, 301);
+  }
+
   const redirect = await getMatchingRedirect(request);
 
   if (!redirect) {
@@ -58,6 +70,7 @@ export async function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     "/wp-content/uploads/:path*",
+    "/sitemap.html",
     "/((?!api|_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|.*\\..*).*)",
   ],
 };
@@ -80,9 +93,23 @@ function getLegacyMediaRedirect(request: NextRequest): URL | null {
   return redirectUrl;
 }
 
+function getLegacyPathRedirect(request: NextRequest): URL | null {
+  const pathname = stripTrailingSlash(request.nextUrl.pathname);
+  const target = LEGACY_PATH_REDIRECTS[pathname];
+
+  if (!target) {
+    return null;
+  }
+
+  const redirectUrl = new URL(target, request.url);
+  redirectUrl.search = request.nextUrl.search;
+
+  return redirectUrl;
+}
+
 function getLegacyDatedPostRedirect(request: NextRequest): URL | null {
   const postSlug = request.nextUrl.pathname.match(
-    /^\/\d{4}\/\d{2}\/\d{2}\/([^/]+)\/?$/,
+    /^\/\d{4}\/\d{2}\/\d{2}\/([^/]+)(?:\/feed)?\/?$/,
   )?.[1];
 
   if (!postSlug) {
