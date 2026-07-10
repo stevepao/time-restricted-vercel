@@ -491,7 +491,7 @@ export async function getCategories(): Promise<WordPressCategory[]> {
     .sort((first, second) => first.name.localeCompare(second.name));
 }
 
-export async function getArchiveMonths(): Promise<WordPressArchiveMonth[]> {
+export const getArchiveMonths = cache(async (): Promise<WordPressArchiveMonth[]> => {
   const posts = await getAllPostSummaries();
   const archiveCounts = new Map<string, WordPressArchiveMonth>();
 
@@ -523,7 +523,7 @@ export async function getArchiveMonths(): Promise<WordPressArchiveMonth[]> {
     (first, second) =>
       second.year - first.year || second.month - first.month,
   );
-}
+});
 
 export async function getAllPosts(): Promise<WordPressPost[]> {
   return getAllPostSummaries();
@@ -606,28 +606,30 @@ export async function getPostBySlug(
     : null;
 }
 
-export async function getAdjacentPosts(
-  slug: string,
-): Promise<{ previous: AdjacentPost | null; next: AdjacentPost | null }> {
-  const posts = await getAllPostSummaries();
-  const currentIndex = posts.findIndex((post) => post.slug === slug);
+export const getAdjacentPosts = cache(
+  async (
+    slug: string,
+  ): Promise<{ previous: AdjacentPost | null; next: AdjacentPost | null }> => {
+    const posts = await getAllPostSummaries();
+    const currentIndex = posts.findIndex((post) => post.slug === slug);
 
-  if (currentIndex === -1) {
-    return { previous: null, next: null };
-  }
+    if (currentIndex === -1) {
+      return { previous: null, next: null };
+    }
 
-  const newerPost = posts[currentIndex - 1] ?? null;
-  const olderPost = posts[currentIndex + 1] ?? null;
+    const newerPost = posts[currentIndex - 1] ?? null;
+    const olderPost = posts[currentIndex + 1] ?? null;
 
-  return {
-    next: newerPost
-      ? { slug: newerPost.slug, title: newerPost.title }
-      : null,
-    previous: olderPost
-      ? { slug: olderPost.slug, title: olderPost.title }
-      : null,
-  };
-}
+    return {
+      next: newerPost
+        ? { slug: newerPost.slug, title: newerPost.title }
+        : null,
+      previous: olderPost
+        ? { slug: olderPost.slug, title: olderPost.title }
+        : null,
+    };
+  },
+);
 
 export async function getPageByUri(uri: string): Promise<WordPressPage | null> {
   const trimmedUri = uri.replace(/^\/|\/$/g, "");
@@ -971,7 +973,7 @@ export async function getAllPostSlugs(): Promise<string[]> {
   return slugs;
 }
 
-async function getAllPostSummaries(): Promise<WordPressPost[]> {
+const getAllPostSummaries = cache(async (): Promise<WordPressPost[]> => {
   const posts: WordPressPost[] = [];
   let after: string | null = null;
   let hasNextPage = true;
@@ -1017,7 +1019,7 @@ async function getAllPostSummaries(): Promise<WordPressPost[]> {
   }
 
   return posts;
-}
+});
 
 function getPostYearMonth(
   date: string | null,

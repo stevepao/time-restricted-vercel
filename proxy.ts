@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 const REDIRECTION_ENDPOINT_PATH = "/wp-json/redirection/v1/redirect";
-const DEFAULT_CACHE_TTL_SECONDS = 300;
+const DEFAULT_CACHE_TTL_SECONDS = 86400;
 const DEFAULT_WORDPRESS_MEDIA_ORIGIN = "https://api.time-restricted.com";
 const MAX_REDIRECT_PAGES = 20;
 const REDIRECTS_PER_PAGE = 100;
@@ -58,6 +58,10 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(legacyPathRedirect, 301);
   }
 
+  if (isKnownFirstPartyPath(request.nextUrl.pathname)) {
+    return NextResponse.next();
+  }
+
   const redirect = await getMatchingRedirect(request);
 
   if (!redirect) {
@@ -91,6 +95,27 @@ function getLegacyMediaRedirect(request: NextRequest): URL | null {
   }
 
   return redirectUrl;
+}
+
+function isKnownFirstPartyPath(pathname: string): boolean {
+  const normalizedPath = stripTrailingSlash(pathname);
+
+  if (
+    normalizedPath === "/" ||
+    normalizedPath === "/all-posts" ||
+    normalizedPath === "/contact" ||
+    normalizedPath === "/privacy-policy"
+  ) {
+    return true;
+  }
+
+  if (!normalizedPath.startsWith("/blog/")) {
+    return false;
+  }
+
+  const slug = normalizedPath.slice("/blog/".length);
+
+  return slug.length > 0 && !slug.includes("/");
 }
 
 function getLegacyPathRedirect(request: NextRequest): URL | null {

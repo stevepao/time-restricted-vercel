@@ -63,7 +63,7 @@ Required for frontend redirects backed by the WordPress Redirection plugin:
 - `WORDPRESS_REDIRECTION_API_URL`: Redirection REST endpoint, for example `https://api.time-restricted.com/wp-json/redirection/v1/redirect`.
 - `WORDPRESS_REDIRECTION_USERNAME`: WordPress username for an account that can read Redirection rules.
 - `WORDPRESS_REDIRECTION_APPLICATION_PASSWORD`: WordPress application password for that account.
-- `WORDPRESS_REDIRECTION_CACHE_TTL_SECONDS`: optional redirect-list cache TTL. Defaults to `300`.
+- `WORDPRESS_REDIRECTION_CACHE_TTL_SECONDS`: optional redirect-list cache TTL. Defaults to `86400` (24 hours).
 
 Required for Mailchimp signup:
 
