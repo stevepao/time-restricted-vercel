@@ -58,6 +58,11 @@ Required for on-demand revalidation:
 
 - `REVALIDATE_SECRET`: shared secret posted to `/api/revalidate`.
 
+Recommended for automatic new-post deploys (see
+[`docs/cms-publish-and-cpu-optimizations.md`](docs/cms-publish-and-cpu-optimizations.md)):
+
+- `VERCEL_DEPLOY_HOOK_URL`: Vercel Deploy Hook URL from **Project → Settings → Git → Deploy Hooks**. When WordPress publishes a new post slug, the revalidation webhook triggers a production rebuild so static blog routes include the new path.
+
 Required for frontend redirects backed by the WordPress Redirection plugin:
 
 - `WORDPRESS_REDIRECTION_API_URL`: Redirection REST endpoint, for example `https://api.time-restricted.com/wp-json/redirection/v1/redirect`.
@@ -107,18 +112,44 @@ WordPress account login and comments use the origin derived from `WORDPRESS_API_
 
 This app is designed for deployment on Vercel. Configure the environment variables in the Vercel project settings, then connect the repository and deploy from the selected branch.
 
+See [`docs/cms-publish-and-cpu-optimizations.md`](docs/cms-publish-and-cpu-optimizations.md)
+for the full WordPress webhook + deploy hook setup and a summary of Vercel CPU
+optimizations applied to this project.
+
 For CMS-driven refreshes, post to `/api/revalidate?token=your-revalidate-secret`:
 
 ```json
 {
-  "slug": "example-post"
+  "post": {
+    "post_name": "example-post",
+    "post_status": "publish",
+    "post_date_gmt": "2026-07-10 21:00:00",
+    "post_modified_gmt": "2026-07-10 21:00:00"
+  }
 }
 ```
 
-The revalidation endpoint also accepts the token in the JSON body, a WordPress
-webhook payload with `post.post_name`, plus a specific `path` or `paths` array.
-If no post slug or path is provided, it refreshes the main WordPress post
-surfaces and the dynamic `/blog/[slug]` route.
+The revalidation endpoint also accepts the token in the JSON body, a plain
+`slug` field, plus a specific `path` or `paths` array.
+
+When a post slug is provided, only that blog path and shared listing surfaces
+are revalidated, and only the `wordpress-posts` fetch cache tag is cleared.
+Full cache tags are cleared only for broad revalidation requests.
+
+Blog routes are generated at build time from WordPress slugs
+(`dynamicParams = false`). **New post slugs** trigger an automatic Vercel
+rebuild when `VERCEL_DEPLOY_HOOK_URL` is configured and the webhook payload
+looks like a first publish. **Existing post edits** refresh through on-demand
+revalidation only.
+
+Force a rebuild manually:
+
+```json
+{
+  "slug": "example-post",
+  "deploy": true
+}
+```
 
 ## License
 

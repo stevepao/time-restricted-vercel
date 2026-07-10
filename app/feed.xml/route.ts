@@ -1,7 +1,7 @@
 import sanitizeHtml from "sanitize-html";
 
 import { getMetadataBase } from "@/lib/metadata";
-import { getAllPosts, type WordPressPost } from "@/lib/wordpress";
+import { getRecentPosts, type WordPressPost } from "@/lib/wordpress";
 
 const SITE_TITLE = "Time Restricted";
 const SITE_DESCRIPTION =
@@ -12,7 +12,7 @@ export const revalidate = 3600;
 
 export async function GET() {
   const siteUrl = getMetadataBase();
-  const posts = (await getAllPosts()).slice(0, FEED_ITEM_LIMIT);
+  const posts = await getRecentPosts(FEED_ITEM_LIMIT);
   const latestPostDate = posts.find((post) => post.date)?.date;
 
   const rss = `<?xml version="1.0" encoding="UTF-8"?>

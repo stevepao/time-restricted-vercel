@@ -1,14 +1,27 @@
 import { revalidatePath, revalidateTag } from "next/cache";
 
 import {
+  shouldTriggerDeployHook,
+  triggerVercelDeployHook,
+} from "@/lib/vercel-deploy";
+import {
   WORDPRESS_CACHE_TAG,
   WORDPRESS_POSTS_CACHE_TAG,
 } from "@/lib/wordpress";
 
-const DEFAULT_WORDPRESS_POST_PATHS = ["/", "/all-posts", "/sitemap.xml"];
-const DEFAULT_WORDPRESS_TAGS = [WORDPRESS_CACHE_TAG, WORDPRESS_POSTS_CACHE_TAG];
+const DEFAULT_FULL_REVALIDATION_PATHS = [
+  "/",
+  "/all-posts",
+  "/feed.xml",
+  "/sitemap.xml",
+];
+const DEFAULT_POST_UPDATE_PATHS = ["/", "/all-posts", "/feed.xml", "/sitemap.xml"];
 
 type RevalidateRequestBody = {
+  action?: unknown;
+  deploy?: unknown;
+  new_status?: unknown;
+  old_status?: unknown;
   token?: unknown;
   path?: unknown;
   paths?: unknown;
@@ -49,7 +62,16 @@ export async function POST(request: Request) {
     revalidateTag(tag, { expire: 0 });
   }
 
+  const deploy = shouldTriggerDeployHook(body ?? {})
+    ? await triggerVercelDeployHook()
+    : {
+        message: null,
+        ok: null,
+        triggered: false,
+      };
+
   return Response.json({
+    deploy,
     now: Date.now(),
     paths,
     revalidated: true,
@@ -90,7 +112,10 @@ function isValidPath(path: unknown): path is string {
 }
 
 function getPathsToRevalidate(body: RevalidateRequestBody): string[] {
-  const paths = new Set<string>(DEFAULT_WORDPRESS_POST_PATHS);
+  const slug = getPostSlug(body);
+  const paths = new Set<string>(
+    slug ? DEFAULT_POST_UPDATE_PATHS : DEFAULT_FULL_REVALIDATION_PATHS,
+  );
 
   if (isValidPath(body.path)) {
     paths.add(body.path);
@@ -104,11 +129,13 @@ function getPathsToRevalidate(body: RevalidateRequestBody): string[] {
     }
   }
 
-  const slug = getPostSlug(body);
-
   if (slug) {
     paths.add(`/blog/${slug}`);
-  } else if (!isValidPath(body.path) && !Array.isArray(body.paths)) {
+  } else if (
+    !slug &&
+    !isValidPath(body.path) &&
+    !Array.isArray(body.paths)
+  ) {
     paths.add("/blog/[slug]");
   }
 
@@ -116,7 +143,7 @@ function getPathsToRevalidate(body: RevalidateRequestBody): string[] {
 }
 
 function getTagsToRevalidate(body: RevalidateRequestBody): string[] {
-  const tags = new Set<string>(DEFAULT_WORDPRESS_TAGS);
+  const tags = new Set<string>();
 
   if (isValidTag(body.tag)) {
     tags.add(body.tag);
@@ -130,7 +157,17 @@ function getTagsToRevalidate(body: RevalidateRequestBody): string[] {
     }
   }
 
-  return Array.from(tags);
+  if (tags.size > 0) {
+    return Array.from(tags);
+  }
+
+  const slug = getPostSlug(body);
+
+  if (slug) {
+    return [WORDPRESS_POSTS_CACHE_TAG];
+  }
+
+  return [WORDPRESS_CACHE_TAG, WORDPRESS_POSTS_CACHE_TAG];
 }
 
 function isDynamicRoutePattern(path: string): boolean {

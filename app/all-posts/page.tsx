@@ -34,6 +34,7 @@ export default async function AllPostsPage() {
               <h2 className="text-2xl font-bold leading-tight tracking-tight text-[#222222]">
                 <Link
                   href={`/blog/${post.slug}`}
+                  prefetch={false}
                   className="text-[#222222] no-underline transition group-hover:text-[#1e73be]"
                   dangerouslySetInnerHTML={{ __html: post.title }}
                 />

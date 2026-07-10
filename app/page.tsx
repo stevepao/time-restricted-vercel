@@ -80,6 +80,7 @@ export default async function Home({ searchParams }: HomePageProps) {
                 <h2 className="text-3xl font-bold leading-tight tracking-tight text-[#222222]">
                   <Link
                     href={`/blog/${post.slug}`}
+                    prefetch={false}
                     className="text-[#222222] no-underline transition group-hover:text-[#1e73be]"
                     dangerouslySetInnerHTML={{ __html: post.title }}
                   />
@@ -93,6 +94,7 @@ export default async function Home({ searchParams }: HomePageProps) {
               </div>
               <Link
                 href={`/blog/${post.slug}`}
+                prefetch={false}
                 className="mt-4 inline-flex items-center text-sm text-[#1e73be] underline underline-offset-4"
               >
                 Read more

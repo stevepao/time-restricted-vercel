@@ -11,8 +11,7 @@ import { buildWordPressMetadata } from "@/lib/metadata";
 import {
   getAdjacentPosts,
   getAllPostSlugs,
-  getPostBySlug,
-  getPostSeoBySlug,
+  getBlogPostPageData,
   type WordPressComment,
 } from "@/lib/wordpress";
 import { getWordPressOrigin } from "@/lib/wordpress-auth";
@@ -33,11 +32,13 @@ export async function generateStaticParams(): Promise<Array<{ slug: string }>> {
   return slugs.map((slug) => ({ slug }));
 }
 
+export const dynamicParams = false;
+
 export async function generateMetadata({
   params,
 }: BlogPostPageProps): Promise<Metadata> {
   const { slug } = await params;
-  const seo = await getPostSeoBySlug(slug);
+  const { seo } = await getBlogPostPageData(slug);
 
   if (!seo) {
     return {};
@@ -56,8 +57,8 @@ export default async function BlogPostPage({
   params,
 }: BlogPostPageProps) {
   const { slug } = await params;
-  const [post, adjacentPosts] = await Promise.all([
-    getPostBySlug(slug),
+  const [{ post }, adjacentPosts] = await Promise.all([
+    getBlogPostPageData(slug),
     getAdjacentPosts(slug),
   ]);
 
@@ -123,6 +124,7 @@ export default async function BlogPostPage({
         {adjacentPosts.previous ? (
           <Link
             href={`/blog/${adjacentPosts.previous.slug}`}
+            prefetch={false}
             className="text-[#1e73be] underline underline-offset-4 transition hover:text-[#222222]"
           >
             <span className="block text-xs uppercase tracking-wider text-[#575760]">
@@ -141,6 +143,7 @@ export default async function BlogPostPage({
         {adjacentPosts.next ? (
           <Link
             href={`/blog/${adjacentPosts.next.slug}`}
+            prefetch={false}
             className="text-left text-[#1e73be] underline underline-offset-4 transition hover:text-[#222222] sm:text-right"
           >
             <span className="block text-xs uppercase tracking-wider text-[#575760]">

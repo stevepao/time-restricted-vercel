@@ -1,10 +1,6 @@
 import Link from "next/link";
 
-import { getLatestPosts } from "@/lib/wordpress";
-
-export default async function NotFound() {
-  const recentPosts = await getLatestPosts();
-
+export default function NotFound() {
   return (
     <section className="bg-white p-7 shadow-sm sm:p-8">
       <p className="text-xs font-medium uppercase tracking-wider text-[#575760]">
@@ -62,51 +58,6 @@ export default async function NotFound() {
           </button>
         </div>
       </form>
-
-      {recentPosts.length > 0 ? (
-        <section className="mt-12 border-t border-zinc-200 pt-8">
-          <h2 className="text-2xl font-normal text-[#222222]">Recent Posts</h2>
-          <div className="mt-6 space-y-5">
-            {recentPosts.slice(0, 5).map((post) => (
-              <article
-                key={post.id}
-                className="group border-t-2 border-[#222222] pt-3"
-              >
-                <div className="mb-2 flex items-center justify-between text-sm font-semibold leading-none text-[#575760]">
-                  <span>{formatPostMonthDay(post.date)}</span>
-                  <span>{formatPostYear(post.date)}</span>
-                </div>
-                <h3 className="text-xl font-bold leading-tight tracking-tight text-[#222222]">
-                  <Link
-                    href={`/blog/${post.slug}`}
-                    className="text-[#222222] no-underline transition group-hover:text-[#1e73be]"
-                    dangerouslySetInnerHTML={{ __html: post.title }}
-                  />
-                </h3>
-              </article>
-            ))}
-          </div>
-        </section>
-      ) : null}
     </section>
   );
-}
-
-function formatPostMonthDay(date: string | null): string {
-  if (!date) {
-    return "";
-  }
-
-  const postDate = new Date(date);
-  return `${String(postDate.getMonth() + 1).padStart(2, "0")}.${String(
-    postDate.getDate(),
-  ).padStart(2, "0")}`;
-}
-
-function formatPostYear(date: string | null): string {
-  if (!date) {
-    return "";
-  }
-
-  return String(new Date(date).getFullYear());
 }

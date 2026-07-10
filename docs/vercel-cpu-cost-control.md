@@ -365,4 +365,4 @@ The highest-value changes for **this** repo:
 | Date | Decision |
 |------|----------|
 | 2026-07-10 | Document imported from another project; applicability reviewed against current codebase. No code changes made yet. |
-| 2026-07-10 | Implemented items 1–3: default Redirection TTL 86400, skip plugin lookup on first-party paths in `proxy.ts`, React `cache()` on `getAllPostSummaries`, `getArchiveMonths`, and `getAdjacentPosts`. |
+| 2026-07-10 | Added Vercel deploy hook on new WordPress publish via `/api/revalidate`; documented in `docs/cms-publish-and-cpu-optimizations.md`. |

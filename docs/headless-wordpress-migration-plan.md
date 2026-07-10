@@ -343,6 +343,10 @@ Revalidate:
 Use `revalidateTag(tag, { expire: 0 })` for external webhooks that need fresh
 data on the next request.
 
+If blog routes use `dynamicParams = false`, also configure a Vercel Deploy Hook
+and set `VERCEL_DEPLOY_HOOK_URL` so first-time publishes trigger a rebuild.
+See `docs/cms-publish-and-cpu-optimizations.md`.
+
 ## 9. Forms, Comments, And Spam Protection
 
 For a site with signup, contact, and comment login forms, protect each workflow

@@ -2,6 +2,9 @@ import { cache } from "react";
 
 export const WORDPRESS_CACHE_TAG = "wordpress";
 export const WORDPRESS_POSTS_CACHE_TAG = "wordpress-posts";
+const WORDPRESS_FETCH_REVALIDATE_SECONDS = 3600;
+
+type WordPressFetchCacheScope = "posts" | "site";
 
 type GraphQLVariables = Record<string, unknown>;
 
@@ -275,6 +278,18 @@ type PostSummariesVariables = {
   after: string | null;
 };
 
+type PostArchiveDatesResponse = {
+  posts: {
+    nodes: Array<{
+      date: string | null;
+    }>;
+    pageInfo: {
+      hasNextPage: boolean;
+      endCursor: string | null;
+    };
+  };
+};
+
 type CategoriesResponse = {
   categories: {
     nodes: WordPressCategory[];
@@ -288,7 +303,11 @@ type CategoriesVariables = {
 export async function wpFetch<
   TData,
   TVariables extends GraphQLVariables = GraphQLVariables,
->(query: string, variables?: TVariables): Promise<TData> {
+>(
+  query: string,
+  variables?: TVariables,
+  cacheScope: WordPressFetchCacheScope = "posts",
+): Promise<TData> {
   const wordpressApiUrl = process.env.WORDPRESS_API_URL;
 
   if (!wordpressApiUrl) {
@@ -300,7 +319,10 @@ export async function wpFetch<
     headers: {
       "Content-Type": "application/json",
     },
-    next: { tags: [WORDPRESS_CACHE_TAG, WORDPRESS_POSTS_CACHE_TAG] },
+    next: {
+      revalidate: WORDPRESS_FETCH_REVALIDATE_SECONDS,
+      tags: getWordPressFetchTags(cacheScope),
+    },
     body: JSON.stringify({
       query,
       variables,
@@ -329,9 +351,13 @@ export async function wpFetch<
 }
 
 export async function getLatestPosts(): Promise<WordPressPost[]> {
+  return getRecentPosts(10);
+}
+
+export async function getRecentPosts(limit: number): Promise<WordPressPost[]> {
   const data = await wpFetch<LatestPostsResponse, LatestPostsVariables>(
     `
-      query GetLatestPosts($first: Int!) {
+      query GetRecentPosts($first: Int!) {
         posts(first: $first, where: { orderby: { field: DATE, order: DESC } }) {
           nodes {
             id
@@ -349,7 +375,7 @@ export async function getLatestPosts(): Promise<WordPressPost[]> {
         }
       }
     `,
-    { first: 10 },
+    { first: limit },
   );
 
   return data.posts.nodes;
@@ -484,6 +510,7 @@ export async function getCategories(): Promise<WordPressCategory[]> {
       }
     `,
     { first: 100 },
+    "site",
   );
 
   return data.categories.nodes
@@ -492,7 +519,7 @@ export async function getCategories(): Promise<WordPressCategory[]> {
 }
 
 export const getArchiveMonths = cache(async (): Promise<WordPressArchiveMonth[]> => {
-  const posts = await getAllPostSummaries();
+  const posts = await getAllPostArchiveDates();
   const archiveCounts = new Map<string, WordPressArchiveMonth>();
 
   for (const post of posts) {
@@ -529,20 +556,19 @@ export async function getAllPosts(): Promise<WordPressPost[]> {
   return getAllPostSummaries();
 }
 
-export async function getPostBySlug(
-  slug: string,
-): Promise<WordPressPostDetail | null> {
-  const comments: WordPressComment[] = [];
-  let commentsAfter: string | null = null;
-  let hasNextCommentsPage = true;
-  let currentPost: WordPressPostDetail | null = null;
+export const getPostBySlug = cache(
+  async (slug: string): Promise<WordPressPostDetail | null> => {
+    const comments: WordPressComment[] = [];
+    let commentsAfter: string | null = null;
+    let hasNextCommentsPage = true;
+    let currentPost: WordPressPostDetail | null = null;
 
-  while (hasNextCommentsPage) {
-    const data: PostBySlugResponse = await wpFetch<
-      PostBySlugResponse,
-      PostBySlugVariables
-    >(
-      `
+    while (hasNextCommentsPage) {
+      const data: PostBySlugResponse = await wpFetch<
+        PostBySlugResponse,
+        PostBySlugVariables
+      >(
+        `
       query GetPostBySlug($slug: ID!, $commentsAfter: String) {
         post(id: $slug, idType: SLUG) {
           commentStatus
@@ -582,29 +608,43 @@ export async function getPostBySlug(
         }
       }
     `,
-      { commentsAfter, slug },
-    );
+        { commentsAfter, slug },
+      );
 
-    if (!data.post) {
-      return null;
+      if (!data.post) {
+        return null;
+      }
+
+      currentPost = data.post;
+      comments.push(...data.post.comments.nodes);
+      hasNextCommentsPage = data.post.comments.pageInfo.hasNextPage;
+      commentsAfter = data.post.comments.pageInfo.endCursor;
     }
 
-    currentPost = data.post;
-    comments.push(...data.post.comments.nodes);
-    hasNextCommentsPage = data.post.comments.pageInfo.hasNextPage;
-    commentsAfter = data.post.comments.pageInfo.endCursor;
-  }
+    return currentPost
+      ? {
+          ...currentPost,
+          comments: {
+            ...currentPost.comments,
+            nodes: comments,
+          },
+        }
+      : null;
+  },
+);
 
-  return currentPost
-    ? {
-        ...currentPost,
-        comments: {
-          ...currentPost.comments,
-          nodes: comments,
-        },
-      }
-    : null;
-}
+export const getBlogPostPageData = cache(
+  async (
+    slug: string,
+  ): Promise<{ post: WordPressPostDetail | null; seo: WordPressSeoData | null }> => {
+    const [post, seo] = await Promise.all([
+      getPostBySlug(slug),
+      getPostSeoBySlug(slug),
+    ]);
+
+    return { post, seo };
+  },
+);
 
 export const getAdjacentPosts = cache(
   async (
@@ -650,6 +690,7 @@ export const getPostSeoBySlug = cache(
   async (slug: string): Promise<WordPressSeoData | null> => {
     const posts = await wpRestFetch<RestSeoDocument[]>(
       `/wp-json/wp/v2/posts?slug=${encodeURIComponent(slug)}`,
+      "posts",
     );
     const post = posts[0];
 
@@ -666,6 +707,7 @@ export const getPageSeoByUri = cache(
     const trimmedUri = uri.replace(/^\/|\/$/g, "");
     const pages = await wpRestFetch<RestSeoDocument[]>(
       `/wp-json/wp/v2/pages?slug=${encodeURIComponent(trimmedUri)}`,
+      "site",
     );
     const page = pages[0];
 
@@ -691,12 +733,16 @@ async function fetchPageByUri(uri: string): Promise<WordPressPage | null> {
       }
     `,
     { uri },
+    "site",
   );
 
   return data.page;
 }
 
-async function wpRestFetch<TData>(path: string): Promise<TData> {
+async function wpRestFetch<TData>(
+  path: string,
+  cacheScope: WordPressFetchCacheScope = "posts",
+): Promise<TData> {
   const wordpressApiUrl = process.env.WORDPRESS_API_URL;
 
   if (!wordpressApiUrl) {
@@ -705,7 +751,10 @@ async function wpRestFetch<TData>(path: string): Promise<TData> {
 
   const url = new URL(path, new URL(wordpressApiUrl).origin);
   const response = await fetch(url, {
-    next: { tags: [WORDPRESS_CACHE_TAG, WORDPRESS_POSTS_CACHE_TAG] },
+    next: {
+      revalidate: WORDPRESS_FETCH_REVALIDATE_SECONDS,
+      tags: getWordPressFetchTags(cacheScope),
+    },
   });
 
   if (!response.ok) {
@@ -801,6 +850,7 @@ async function getRestFeaturedImage(
   if (document.featured_media) {
     const media = await wpRestFetch<RestMedia>(
       `/wp-json/wp/v2/media/${document.featured_media}?_fields=source_url,media_details`,
+      "posts",
     );
     const preferredSize =
       media.media_details?.sizes?.["featured-content-lg"] ??
@@ -973,6 +1023,44 @@ export async function getAllPostSlugs(): Promise<string[]> {
   return slugs;
 }
 
+const getAllPostArchiveDates = cache(async (): Promise<Array<{ date: string | null }>> => {
+  const posts: Array<{ date: string | null }> = [];
+  let after: string | null = null;
+  let hasNextPage = true;
+
+  while (hasNextPage) {
+    const data: PostArchiveDatesResponse = await wpFetch<
+      PostArchiveDatesResponse,
+      PostSummariesVariables
+    >(
+      `
+        query GetAllPostArchiveDates($first: Int!, $after: String) {
+          posts(
+            first: $first
+            after: $after
+            where: { orderby: { field: DATE, order: DESC } }
+          ) {
+            nodes {
+              date
+            }
+            pageInfo {
+              hasNextPage
+              endCursor
+            }
+          }
+        }
+      `,
+      { first: 100, after },
+    );
+
+    posts.push(...data.posts.nodes);
+    hasNextPage = data.posts.pageInfo.hasNextPage;
+    after = data.posts.pageInfo.endCursor;
+  }
+
+  return posts;
+});
+
 const getAllPostSummaries = cache(async (): Promise<WordPressPost[]> => {
   const posts: WordPressPost[] = [];
   let after: string | null = null;
@@ -1020,6 +1108,14 @@ const getAllPostSummaries = cache(async (): Promise<WordPressPost[]> => {
 
   return posts;
 });
+
+function getWordPressFetchTags(
+  cacheScope: WordPressFetchCacheScope,
+): string[] {
+  return cacheScope === "posts"
+    ? [WORDPRESS_POSTS_CACHE_TAG]
+    : [WORDPRESS_CACHE_TAG];
+}
 
 function getPostYearMonth(
   date: string | null,

@@ -158,6 +158,7 @@ export default async function RootLayout({
                     <li key={post.id}>
                       <Link
                         href={`/blog/${post.slug}`}
+                        prefetch={false}
                         className="text-[#555555] underline underline-offset-2 transition hover:text-[#111111]"
                         dangerouslySetInnerHTML={{ __html: post.title }}
                       />
