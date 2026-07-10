@@ -22,6 +22,41 @@ Because you publish infrequently, the rebuild is triggered automatically through
 
 ---
 
+## Why not ISR-only?
+
+Most headless WordPress + Next.js setups use **ISR with webhook revalidation** and
+**no content deploys**:
+
+| Concern | Typical pattern (ISR-only) | This project |
+|---------|---------------------------|--------------|
+| CMS updates | WordPress webhook → `/api/revalidate` | Same |
+| New post slugs | Render on first request (`dynamicParams` defaults to `true`) | Prebuilt at deploy; unknown slugs **404** (`dynamicParams = false`) |
+| Cache invalidation | `revalidatePath` / `revalidateTag` refresh lists and the post URL | Same for paths that already exist |
+| Vercel Deploy Hooks | **Code and config only** — not for every publish | Also fired on **first publish** so `generateStaticParams()` picks up the new slug |
+
+**Rule of thumb:** ISR + webhooks should handle all WordPress content; deploy hooks
+belong to deployments, not the editorial workflow.
+
+**Exception here:** We set `dynamicParams = false` on blog posts so bot traffic
+probing random `/blog/*` URLs gets a cheap static 404 instead of dynamic SSR against
+WordPress. That saves CPU, but it also means `revalidatePath('/blog/new-slug')`
+cannot create a route that was never built — only a full rebuild (or flipping back to
+`dynamicParams = true`) can.
+
+So for **this** site:
+
+- **Existing post edits** → webhook revalidation only (no redeploy).
+- **Brand-new slugs** → webhook revalidation **plus** deploy hook (or wait for the
+  next code deploy).
+- **Code changes** → normal Git deploy; the deploy hook is not a substitute for that.
+
+To match the ISR-only model instead, remove `dynamicParams = false` from
+`app/blog/[slug]/page.tsx` and drop `VERCEL_DEPLOY_HOOK_URL` for content publishes.
+New slugs would then render on demand after the webhook clears cache, at the cost of
+more server work on garbage slug probes.
+
+---
+
 ## CPU Optimizations Implemented
 
 ### Proxy / redirects

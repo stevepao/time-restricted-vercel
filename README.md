@@ -113,8 +113,9 @@ WordPress account login and comments use the origin derived from `WORDPRESS_API_
 This app is designed for deployment on Vercel. Configure the environment variables in the Vercel project settings, then connect the repository and deploy from the selected branch.
 
 See [`docs/cms-publish-and-cpu-optimizations.md`](docs/cms-publish-and-cpu-optimizations.md)
-for the full WordPress webhook + deploy hook setup and a summary of Vercel CPU
-optimizations applied to this project.
+for the full WordPress webhook + deploy hook setup, how this differs from the usual
+ISR-only headless WordPress pattern ([Why not ISR-only?](docs/cms-publish-and-cpu-optimizations.md#why-not-isr-only)),
+and a summary of Vercel CPU optimizations applied to this project.
 
 For CMS-driven refreshes, post to `/api/revalidate?token=your-revalidate-secret`:
 
