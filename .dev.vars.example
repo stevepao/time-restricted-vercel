@@ -1,7 +1,7 @@
 # Copy to .dev.vars for `npm run preview` (gitignored).
 NEXTJS_ENV=development
 
-WORDPRESS_API_URL=https://time-restricted.com/graphql
+WORDPRESS_API_URL=https://api.time-restricted.com/graphql
 SITE_URL=https://time-restricted.com
 REVALIDATE_SECRET=
 CF_DEPLOY_HOOK_URL=

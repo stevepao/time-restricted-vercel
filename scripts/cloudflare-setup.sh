@@ -9,29 +9,59 @@ cd "$ROOT"
 echo "==> Creating R2 bucket (ok if it already exists)"
 npx wrangler r2 bucket create time-restricted-next-cache || true
 
-echo "==> Creating D1 database"
+echo "==> Creating D1 database (ok if it already exists)"
 CREATE_OUT="$(npx wrangler d1 create time-restricted-next-tag-cache 2>&1 || true)"
 echo "$CREATE_OUT"
 
 DB_ID="$(printf '%s\n' "$CREATE_OUT" | sed -n 's/.*"database_id": "\([^"]*\)".*/\1/p' | head -1)"
 if [[ -z "${DB_ID}" ]]; then
-  echo "Could not parse database_id from create output."
-  echo "If the DB already exists, run: npx wrangler d1 list"
+  echo "Create did not return an id (likely already exists). Looking up via d1 list…"
+  LIST_OUT="$(npx wrangler d1 list 2>&1 || true)"
+  echo "$LIST_OUT"
+  DB_ID="$(printf '%s\n' "$LIST_OUT" | python3 - <<'PY'
+import re, sys
+text = sys.stdin.read()
+# Prefer exact name match on the same line as a UUID
+for line in text.splitlines():
+    if "time-restricted-next-tag-cache" in line:
+        m = re.search(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", line, re.I)
+        if m:
+            print(m.group(0))
+            break
+PY
+)"
+fi
+
+if [[ -z "${DB_ID}" || "${DB_ID}" == "00000000-0000-0000-0000-000000000000" ]]; then
+  echo "Could not resolve database_id. Run: npx wrangler d1 list"
   echo "Then paste the UUID into wrangler.jsonc → d1_databases[0].database_id"
-else
-  echo "Updating wrangler.jsonc database_id → ${DB_ID}"
-  python3 - <<PY
+  exit 1
+fi
+
+echo "Updating wrangler.jsonc database_id → ${DB_ID}"
+python3 - <<PY
 from pathlib import Path
+import re
 path = Path("wrangler.jsonc")
 text = path.read_text()
-old = '"database_id": "00000000-0000-0000-0000-000000000000"'
-new = f'"database_id": "{DB_ID}"'
-if old not in text:
-    raise SystemExit("Placeholder database_id not found; update wrangler.jsonc manually.")
-path.write_text(text.replace(old, new, 1))
+updated, n = re.subn(
+    r'("database_name": "time-restricted-next-tag-cache",\s*"database_id": ")[^"]+(")',
+    r"\g<1>${DB_ID}\2",
+    text,
+    count=1,
+)
+if n != 1:
+    updated, n = re.subn(
+        r'("database_id": ")00000000-0000-0000-0000-000000000000(")',
+        r"\g<1>${DB_ID}\2",
+        text,
+        count=1,
+    )
+if n != 1:
+    raise SystemExit("Could not update database_id in wrangler.jsonc; edit it manually.")
+path.write_text(updated)
 print("wrangler.jsonc updated.")
 PY
-fi
 
 echo "==> Applying D1 schema (remote + local)"
 npx wrangler d1 execute time-restricted-next-tag-cache --remote --file=./migrations/0001_revalidations.sql

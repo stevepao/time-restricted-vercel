@@ -1,5 +1,3 @@
-import module from "node:module";
-
 type ContactEmailMessage = {
   from: string;
   replyTo: string;
@@ -16,6 +14,11 @@ type SmtpConfig = {
   secure: boolean;
   to: string;
   user: string;
+};
+
+type MailAddress = {
+  email: string;
+  name?: string;
 };
 
 export function getSmtpConfigFromEnv(): SmtpConfig | null {
@@ -79,7 +82,12 @@ function shouldUseWorkerMailer(): boolean {
     return false;
   }
 
-  // OpenNext / Workers runtime marker (see OpenNext cloudflare:* examples).
+  // OpenNext sets NEXTJS_ENV=production in wrangler vars for Workers deploys.
+  if (process.env.NEXTJS_ENV === "production") {
+    return true;
+  }
+
+  // Cloudflare Workers / OpenNext runtime markers.
   return Boolean(
     (globalThis as { Cloudflare?: unknown }).Cloudflare ||
       (typeof navigator !== "undefined" &&
@@ -115,18 +123,7 @@ async function sendWithWorkerMailer(
   config: SmtpConfig,
   message: ContactEmailMessage,
 ): Promise<void> {
-  // Prefer createRequire so OpenNext/esbuild does not statically pull
-  // `cloudflare:sockets` into the Node graph (same pattern as OpenNext examples).
-  const require = module.createRequire("file:///");
-  const { WorkerMailer } = require("@workermailer/smtp") as {
-    WorkerMailer: {
-      connect: (options: Record<string, unknown>) => Promise<{
-        close?: () => Promise<void>;
-        send: (email: Record<string, unknown>) => Promise<void>;
-      }>;
-    };
-  };
-
+  const { WorkerMailer } = await import("@workermailer/smtp");
   const mailer = await WorkerMailer.connect({
     authType: "login",
     credentials: {
@@ -139,17 +136,38 @@ async function sendWithWorkerMailer(
     startTls: !config.secure,
   });
 
+  const from = parseMailAddress(message.from);
+  const reply = parseMailAddress(message.replyTo);
+  const to = parseMailAddress(message.to).email;
+
   try {
     await mailer.send({
-      from: message.from,
-      reply: message.replyTo,
+      from,
+      reply,
       subject: message.subject,
       text: message.text,
-      to: message.to,
+      to,
     });
   } finally {
     if (typeof mailer.close === "function") {
       await mailer.close().catch(() => undefined);
     }
   }
+}
+
+/** Accepts `user@example.com` or `Display Name <user@example.com>`. */
+function parseMailAddress(value: string): MailAddress {
+  const trimmed = value.trim();
+  const angled = trimmed.match(/^(.*?)\s*<([^<>]+)>$/);
+
+  if (angled) {
+    const name = angled[1]?.trim().replace(/^["']|["']$/g, "");
+    const email = angled[2]?.trim();
+
+    if (email) {
+      return name ? { email, name } : { email };
+    }
+  }
+
+  return { email: trimmed };
 }

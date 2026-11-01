@@ -24,7 +24,7 @@
     {
       "binding": "NEXT_TAG_CACHE_D1",
       "database_name": "time-restricted-next-tag-cache",
-      "database_id": "00000000-0000-0000-0000-000000000000"
+      "database_id": "2d4e037c-378a-4cfd-b0cd-10f4e1768d47"
     }
   ],
   "durable_objects": {
@@ -43,8 +43,9 @@
   ],
   "vars": {
     "NEXTJS_ENV": "production",
+    "USE_WORKERMAILER": "true",
     "SITE_URL": "https://time-restricted.com",
-    "WORDPRESS_API_URL": "https://time-restricted.com/graphql",
+    "WORDPRESS_API_URL": "https://api.time-restricted.com/graphql",
     "WORDPRESS_REDIRECTION_API_URL": "https://api.time-restricted.com/wp-json/redirection/v1/redirect",
     "WORDPRESS_REDIRECTION_CACHE_TTL_SECONDS": "86400",
     "SMTP_HOST": "smtp.purelymail.com",

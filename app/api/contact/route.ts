@@ -55,7 +55,11 @@ export async function POST(request: Request) {
     });
 
     return redirectWithStatus(request, "success");
-  } catch {
+  } catch (error: unknown) {
+    console.error(
+      "Contact form send failed:",
+      error instanceof Error ? error.message : error,
+    );
     return redirectWithStatus(request, "error");
   }
 }
