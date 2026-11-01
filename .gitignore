@@ -16,6 +16,7 @@
 # next.js
 /.next/
 /out/
+.open-next
 
 # production
 /build
@@ -33,9 +34,13 @@ yarn-error.log*
 # env files
 .env*
 !.env.example
+.dev.vars
+!.dev.vars.example
 
-# vercel
+# vercel / cloudflare
 .vercel
+.wrangler
+cloudflare-env.d.ts
 
 # typescript
 *.tsbuildinfo

@@ -1,10 +1,13 @@
 # CMS Publish Workflow And CPU Optimizations
 
-This document describes the Vercel CPU optimizations applied to
+This document describes the CPU optimizations applied to
 **time-restricted.com**, how publishing from WordPress refreshes the frontend,
 and how to configure automatic deploys for new post slugs.
 
-Last updated: 2026-07-10.
+Hosting target: **Cloudflare Workers** (OpenNext). See
+[`cloudflare-workers-migration.md`](./cloudflare-workers-migration.md).
+
+Last updated: 2026-11-01.
 
 ---
 
@@ -14,11 +17,12 @@ The site prebuilds blog routes at deploy time (`dynamicParams = false`) to avoid
 dynamic SSR cost from bot traffic probing random `/blog/*` URLs. That means:
 
 - **Editing an existing post** → on-demand revalidation is enough.
-- **Publishing a brand-new slug** → Vercel must rebuild so
+- **Publishing a brand-new slug** → production must rebuild so
   `generateStaticParams()` includes the new path.
 
 Because you publish infrequently, the rebuild is triggered automatically through a
-**Vercel Deploy Hook** wired into the existing WordPress revalidation webhook.
+**Cloudflare Deploy Hook** (`CF_DEPLOY_HOOK_URL`) wired into the existing WordPress
+revalidation webhook.
 
 ---
 
@@ -32,7 +36,7 @@ Most headless WordPress + Next.js setups use **ISR with webhook revalidation** a
 | CMS updates | WordPress webhook → `/api/revalidate` | Same |
 | New post slugs | Render on first request (`dynamicParams` defaults to `true`) | Prebuilt at deploy; unknown slugs **404** (`dynamicParams = false`) |
 | Cache invalidation | `revalidatePath` / `revalidateTag` refresh lists and the post URL | Same for paths that already exist |
-| Vercel Deploy Hooks | **Code and config only** — not for every publish | Also fired on **first publish** so `generateStaticParams()` picks up the new slug |
+| Deploy Hooks | **Code and config only** — not for every publish | Also fired on **first publish** so `generateStaticParams()` picks up the new slug |
 
 **Rule of thumb:** ISR + webhooks should handle all WordPress content; deploy hooks
 belong to deployments, not the editorial workflow.
@@ -51,7 +55,7 @@ So for **this** site:
 - **Code changes** → normal Git deploy; the deploy hook is not a substitute for that.
 
 To match the ISR-only model instead, remove `dynamicParams = false` from
-`app/blog/[slug]/page.tsx` and drop `VERCEL_DEPLOY_HOOK_URL` for content publishes.
+`app/blog/[slug]/page.tsx` and drop `CF_DEPLOY_HOOK_URL` for content publishes.
 New slugs would then render on demand after the webhook clears cache, at the cost of
 more server work on garbage slug probes.
 
@@ -91,7 +95,7 @@ more server work on garbage slug probes.
 | Change | File | Effect |
 |--------|------|--------|
 | Narrow tag invalidation for single-post updates | `app/api/revalidate/route.ts` | Post edits clear `wordpress-posts` only |
-| Deploy hook on new publish | `app/api/revalidate/route.ts`, `lib/vercel-deploy.ts` | New slugs trigger Vercel rebuild automatically |
+| Deploy hook on new publish | `app/api/revalidate/route.ts`, `lib/deploy-hook.ts` | New slugs trigger Cloudflare rebuild automatically |
 | Revalidate `/feed.xml` on post changes | `app/api/revalidate/route.ts` | Feed stays current between deploys |
 
 Further background and applicability notes live in
@@ -108,11 +112,11 @@ flowchart TD
   C -->|No| D[401]
   C -->|Yes| E[revalidatePath + revalidateTag]
   E --> F{New publish?}
-  F -->|Yes| G[POST VERCEL_DEPLOY_HOOK_URL]
+  F -->|Yes| G[POST CF_DEPLOY_HOOK_URL]
   F -->|No| H[Return success]
   G --> H
   H --> I[Existing pages refresh immediately]
-  G --> J[Vercel rebuild adds new /blog/slug]
+  G --> J[Production rebuild adds new /blog/slug]
 ```
 
 ### Existing post updated
@@ -126,22 +130,22 @@ flowchart TD
 
 1. Same revalidation as above (immediate partial refresh)
 2. Deploy hook fires when the payload looks like a **first publish**
-3. Vercel rebuild runs `generateStaticParams()` and adds the new slug
+3. Production rebuild runs `generateStaticParams()` and adds the new slug
 
 ---
 
-## Setup: Vercel Deploy Hook
+## Setup: Cloudflare Deploy Hook
 
-1. Open **Vercel → Project → Settings → Git → Deploy Hooks**
-2. Create a hook for your production branch (for example `main`)
-3. Copy the hook URL (looks like `https://api.vercel.com/v1/integrations/deploy/...`)
-4. Add to Vercel environment variables:
+1. Open **Cloudflare Dashboard → Workers & Pages → time-restricted → Settings**
+2. Create a **Deploy Hook** for your production branch
+3. Copy the hook URL
+4. Store it as a Worker secret:
 
 ```bash
-VERCEL_DEPLOY_HOOK_URL=https://api.vercel.com/v1/integrations/deploy/prj_…/…
+npx wrangler secret put CF_DEPLOY_HOOK_URL
 ```
 
-5. Redeploy once so the running app can read the new variable
+During migration, `VERCEL_DEPLOY_HOOK_URL` remains a code fallback if set.
 
 The hook URL is a secret — treat it like a password. Do not commit it to Git.
 
@@ -228,7 +232,7 @@ Successful revalidation returns:
 }
 ```
 
-If `VERCEL_DEPLOY_HOOK_URL` is unset, `deploy.triggered` is `false`.
+If `CF_DEPLOY_HOOK_URL` (and fallbacks) are unset, `deploy.triggered` is `false`.
 
 ---
 
@@ -237,7 +241,8 @@ If `VERCEL_DEPLOY_HOOK_URL` is unset, `deploy.triggered` is `false`.
 | Variable | Required | Purpose |
 |----------|----------|---------|
 | `REVALIDATE_SECRET` | Yes | Authenticates webhook requests |
-| `VERCEL_DEPLOY_HOOK_URL` | Recommended | Triggers production rebuild for new slugs |
+| `CF_DEPLOY_HOOK_URL` | Recommended | Triggers production rebuild for new slugs |
+| `VERCEL_DEPLOY_HOOK_URL` | Migration fallback | Legacy Vercel hook name still accepted |
 | `WORDPRESS_REDIRECTION_CACHE_TTL_SECONDS` | Optional | Default `86400` in code |
 
 ---
@@ -246,10 +251,10 @@ If `VERCEL_DEPLOY_HOOK_URL` is unset, `deploy.triggered` is `false`.
 
 After configuration:
 
-1. **Edit an existing post** in WordPress → page updates without a full Vercel deploy
+1. **Edit an existing post** in WordPress → page updates without a full rebuild
 2. **Publish a new post** → webhook response shows `deploy.triggered: true`
-3. **Wait for Vercel deploy** → new `/blog/{slug}` returns 200 (not 404)
-4. **Check Vercel Usage** → Fluid Active CPU should trend down over 24–48 hours
+3. **Wait for Cloudflare deploy** → new `/blog/{slug}` returns 200 (not 404)
+4. **Check Workers analytics** → request/CPU usage after cutover
 
 ---
 
@@ -260,7 +265,7 @@ After configuration:
 | New post 404s after webhook | Deploy hook missing or failed; check response `deploy.ok` |
 | Every edit triggers deploy | Webhook sends `"deploy": true` or `"action": "created"` on updates; adjust plugin |
 | Updates feel stale | Revalidation token wrong, or webhook not firing |
-| Deploy hook `ok: false` | Hook URL wrong/revoked; recreate in Vercel settings |
+| Deploy hook `ok: false` | Hook URL wrong/revoked; recreate in Cloudflare Workers settings |
 
 ---
 
@@ -269,6 +274,7 @@ After configuration:
 | File | Role |
 |------|------|
 | `app/api/revalidate/route.ts` | Webhook entry point |
-| `lib/vercel-deploy.ts` | Deploy hook trigger logic |
+| `lib/deploy-hook.ts` | Deploy hook trigger logic |
 | `app/blog/[slug]/page.tsx` | Static slug generation |
+| `docs/cloudflare-workers-migration.md` | Workers cutover runbook |
 | `docs/vercel-cpu-cost-control.md` | Full CPU audit and applicability matrix |

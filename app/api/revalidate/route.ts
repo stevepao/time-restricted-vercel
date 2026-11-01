@@ -2,8 +2,8 @@ import { revalidatePath, revalidateTag } from "next/cache";
 
 import {
   shouldTriggerDeployHook,
-  triggerVercelDeployHook,
-} from "@/lib/vercel-deploy";
+  triggerDeployHook,
+} from "@/lib/deploy-hook";
 import {
   WORDPRESS_CACHE_TAG,
   WORDPRESS_POSTS_CACHE_TAG,
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
   }
 
   const deploy = shouldTriggerDeployHook(body ?? {})
-    ? await triggerVercelDeployHook()
+    ? await triggerDeployHook()
     : {
         message: null,
         ok: null,

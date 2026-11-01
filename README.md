@@ -8,19 +8,20 @@ Time Restricted is a headless Next.js site for essays about time-restricted eati
 - Static blog post routes generated from WordPress slugs, with sanitized post content and comments.
 - Authenticated commenting through WordPress JWT auth and the WordPress REST API.
 - Sidebar recent posts, archives, categories, author bio, and Mailchimp signup.
-- Contact form delivery through SMTP with Nodemailer.
+- Contact form delivery through SMTP (`@workermailer/smtp` on Cloudflare Workers; Nodemailer for local/`next dev`).
 - RSS feed at `/feed.xml`.
 - Privacy policy page loaded from WordPress page content.
 - On-demand path revalidation endpoint for CMS or deployment hooks.
 
 ## Stack
 
-- Next.js `16.2.7` App Router
+- Next.js App Router (see `package.json`)
 - React `19.2.4`
 - TypeScript
 - Tailwind CSS v4
 - WPGraphQL and WordPress REST API
-- Nodemailer for contact email
+- Cloudflare Workers via `@opennextjs/cloudflare`
+- `@workermailer/smtp` / Nodemailer for contact email
 - Mailchimp Marketing API for newsletter subscriptions
 
 ## Getting Started
@@ -61,7 +62,8 @@ Required for on-demand revalidation:
 Recommended for automatic new-post deploys (see
 [`docs/cms-publish-and-cpu-optimizations.md`](docs/cms-publish-and-cpu-optimizations.md)):
 
-- `VERCEL_DEPLOY_HOOK_URL`: Vercel Deploy Hook URL from **Project → Settings → Git → Deploy Hooks**. When WordPress publishes a new post slug, the revalidation webhook triggers a production rebuild so static blog routes include the new path.
+- `CF_DEPLOY_HOOK_URL`: Cloudflare Workers Deploy Hook URL. When WordPress publishes a new post slug, the revalidation webhook triggers a production rebuild so static blog routes include the new path.
+- `VERCEL_DEPLOY_HOOK_URL`: legacy fallback during the Vercel → Cloudflare migration.
 
 Required for frontend redirects backed by the WordPress Redirection plugin:
 
@@ -103,19 +105,25 @@ WordPress account login and comments use the origin derived from `WORDPRESS_API_
 
 ## Scripts
 
-- `npm run dev`: start the local development server.
-- `npm run build`: create a production build.
-- `npm run start`: start the production server after a build.
+- `npm run dev`: start the local Next.js development server.
+- `npm run build`: create a Next.js production build.
+- `npm run start`: start the Node production server after a build.
 - `npm run lint`: run ESLint.
+- `npm run preview`: OpenNext build + local Cloudflare Workers preview.
+- `npm run deploy`: OpenNext build + deploy to Cloudflare Workers.
+- `npm run upload`: OpenNext build + upload a new Worker version.
+- `npm run cf-typegen`: generate Cloudflare binding types.
 
 ## Deployment
 
-This app is designed for deployment on Vercel. Configure the environment variables in the Vercel project settings, then connect the repository and deploy from the selected branch.
+**Primary target: Cloudflare Workers** via `@opennextjs/cloudflare`.
+
+See [`docs/cloudflare-workers-migration.md`](docs/cloudflare-workers-migration.md) for R2/D1 setup, secrets, Turnstile hostnames, preview smoke tests, and DNS cutover (keep Vercel `main` untouched until cutover).
 
 See [`docs/cms-publish-and-cpu-optimizations.md`](docs/cms-publish-and-cpu-optimizations.md)
-for the full WordPress webhook + deploy hook setup, how this differs from the usual
+for the WordPress webhook + deploy hook workflow, how this differs from the usual
 ISR-only headless WordPress pattern ([Why not ISR-only?](docs/cms-publish-and-cpu-optimizations.md#why-not-isr-only)),
-and a summary of Vercel CPU optimizations applied to this project.
+and CPU-control notes.
 
 For CMS-driven refreshes, post to `/api/revalidate?token=your-revalidate-secret`:
 
@@ -138,8 +146,8 @@ are revalidated, and only the `wordpress-posts` fetch cache tag is cleared.
 Full cache tags are cleared only for broad revalidation requests.
 
 Blog routes are generated at build time from WordPress slugs
-(`dynamicParams = false`). **New post slugs** trigger an automatic Vercel
-rebuild when `VERCEL_DEPLOY_HOOK_URL` is configured and the webhook payload
+(`dynamicParams = false`). **New post slugs** trigger an automatic production
+rebuild when `CF_DEPLOY_HOOK_URL` is configured and the webhook payload
 looks like a first publish. **Existing post edits** refresh through on-demand
 revalidation only.
 

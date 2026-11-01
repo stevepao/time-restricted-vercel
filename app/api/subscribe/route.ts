@@ -54,9 +54,7 @@ export async function POST(request: Request) {
     {
       method: "POST",
       headers: {
-        Authorization: `Basic ${Buffer.from(`anystring:${apiKey}`).toString(
-          "base64",
-        )}`,
+        Authorization: `Basic ${btoa(`anystring:${apiKey}`)}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({

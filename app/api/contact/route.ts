@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import nodemailer from "nodemailer";
+
+import {
+  getSmtpConfigFromEnv,
+  sendContactEmail,
+} from "@/lib/send-contact-email";
 
 const TURNSTILE_ACTION = "contact_form";
 const TURNSTILE_SITEVERIFY_URL =
@@ -22,15 +26,10 @@ export async function POST(request: Request) {
     return redirectWithStatus(request, "missing-fields");
   }
 
-  const host = process.env.SMTP_HOST;
-  const port = Number(process.env.SMTP_PORT ?? 587);
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
-  const from = process.env.SMTP_FROM ?? user;
-  const to = process.env.CONTACT_TO ?? user;
+  const smtp = getSmtpConfigFromEnv();
   const turnstileSecretKey = process.env.CONTACT_TURNSTILE_SECRET_KEY;
 
-  if (!host || !port || !user || !pass || !from || !to || !turnstileSecretKey) {
+  if (!smtp || !turnstileSecretKey) {
     return redirectWithStatus(request, "not-configured");
   }
 
@@ -48,28 +47,11 @@ export async function POST(request: Request) {
     return redirectWithStatus(request, "turnstile-failed");
   }
 
-  const transporter = nodemailer.createTransport({
-    auth: {
-      pass,
-      user,
-    },
-    host,
-    port,
-    secure: process.env.SMTP_SECURE === "true" || port === 465,
-  });
-
   try {
-    await transporter.sendMail({
-      from,
+    await sendContactEmail(smtp, {
       replyTo: email,
       subject: `[Time Restricted] ${subject}`,
-      text: [
-        `Name: ${name}`,
-        `Email: ${email}`,
-        "",
-        message,
-      ].join("\n"),
-      to,
+      text: [`Name: ${name}`, `Email: ${email}`, "", message].join("\n"),
     });
 
     return redirectWithStatus(request, "success");

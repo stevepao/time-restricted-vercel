@@ -53,12 +53,21 @@ export function shouldTriggerDeployHook(body: DeployHookBody): boolean {
   return isFirstPublish(post);
 }
 
-export async function triggerVercelDeployHook(): Promise<DeployHookResult> {
-  const deployHookUrl = process.env.VERCEL_DEPLOY_HOOK_URL;
+/**
+ * Triggers a production rebuild so `generateStaticParams()` picks up new blog
+ * slugs (`dynamicParams = false`). Prefers Cloudflare Workers deploy hooks;
+ * falls back to the legacy Vercel env name during migration.
+ */
+export async function triggerDeployHook(): Promise<DeployHookResult> {
+  const deployHookUrl =
+    process.env.CF_DEPLOY_HOOK_URL ??
+    process.env.DEPLOY_HOOK_URL ??
+    process.env.VERCEL_DEPLOY_HOOK_URL;
 
   if (!deployHookUrl) {
     return {
-      message: "VERCEL_DEPLOY_HOOK_URL is not configured.",
+      message:
+        "CF_DEPLOY_HOOK_URL (or DEPLOY_HOOK_URL / VERCEL_DEPLOY_HOOK_URL) is not configured.",
       ok: null,
       triggered: false,
     };
