@@ -2,6 +2,14 @@
 
 Time Restricted is a headless Next.js site for essays about time-restricted eating, Type II diabetes, chronic kidney disease, and related personal health experiments. The app renders content from the WordPress site at `time-restricted.com` and adds a modern static-first front end for posts, archives, comments, contact, and subscriptions.
 
+## Hosting
+
+**Production runs on Cloudflare Workers** (OpenNext), not Vercel.
+
+This site started on Vercel. Build-time static generation for every WordPress post slug, plus on-demand revalidation and redirect work, pushed against Vercel’s CPU / usage limits. The front end was moved to Cloudflare Workers so publish and revalidation stay predictable without those limits. DNS for `time-restricted.com` points at the Worker; the Vercel Git integration was disconnected after cutover.
+
+The local folder / GitHub repo name still ends in `-vercel` for historical reasons. That name is inaccurate now; leave it as-is so existing clones, CI paths, and bookmarks keep working.
+
 ## Features
 
 - Featured essays, all-posts listing, search results, category archives, and month archives backed by WPGraphQL.
@@ -63,7 +71,6 @@ Recommended for automatic new-post deploys (see
 [`docs/cms-publish-and-cpu-optimizations.md`](docs/cms-publish-and-cpu-optimizations.md)):
 
 - `CF_DEPLOY_HOOK_URL`: Cloudflare Workers Deploy Hook URL. When WordPress publishes a new post slug, the revalidation webhook triggers a production rebuild so static blog routes include the new path.
-- `VERCEL_DEPLOY_HOOK_URL`: legacy fallback during the Vercel → Cloudflare migration.
 
 Required for frontend redirects backed by the WordPress Redirection plugin:
 
@@ -116,14 +123,15 @@ WordPress account login and comments use the origin derived from `WORDPRESS_API_
 
 ## Deployment
 
-**Primary target: Cloudflare Workers** via `@opennextjs/cloudflare`.
+Deploy with `npm run deploy` (OpenNext → Cloudflare Workers). Wrangler config lives in `wrangler.jsonc`.
 
-See [`docs/cloudflare-workers-migration.md`](docs/cloudflare-workers-migration.md) for R2/D1 setup, secrets, Turnstile hostnames, preview smoke tests, and DNS cutover (keep Vercel `main` untouched until cutover).
+See [`docs/cloudflare-workers-migration.md`](docs/cloudflare-workers-migration.md) for R2/D1 setup, secrets, Turnstile hostnames, and the cutover notes from the Vercel migration.
 
 See [`docs/cms-publish-and-cpu-optimizations.md`](docs/cms-publish-and-cpu-optimizations.md)
 for the WordPress webhook + deploy hook workflow, how this differs from the usual
 ISR-only headless WordPress pattern ([Why not ISR-only?](docs/cms-publish-and-cpu-optimizations.md#why-not-isr-only)),
-and CPU-control notes.
+and CPU-control notes. The older [`docs/vercel-cpu-cost-control.md`](docs/vercel-cpu-cost-control.md)
+notes apply to the pre-migration Vercel era.
 
 For CMS-driven refreshes, post to `/api/revalidate?token=your-revalidate-secret`:
 
