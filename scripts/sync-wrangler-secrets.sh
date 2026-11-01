@@ -36,10 +36,17 @@ put_secret VERCEL_DEPLOY_HOOK_URL
 put_secret WORDPRESS_REDIRECTION_USERNAME
 put_secret WORDPRESS_REDIRECTION_APPLICATION_PASSWORD
 put_secret MAILCHIMP_API_KEY
+put_secret MAILCHIMP_LIST_ID
 put_secret MAILCHIMP_TURNSTILE_SECRET_KEY
+put_secret SMTP_USER
 put_secret SMTP_PASS
+put_secret SMTP_FROM
+put_secret CONTACT_TO
 put_secret CONTACT_TURNSTILE_SECRET_KEY
 put_secret COMMENT_LOGIN_TURNSTILE_SECRET_KEY
+put_secret NEXT_PUBLIC_MAILCHIMP_TURNSTILE_SITE_KEY
+put_secret NEXT_PUBLIC_CONTACT_TURNSTILE_SITE_KEY
+put_secret NEXT_PUBLIC_COMMENT_LOGIN_TURNSTILE_SITE_KEY
 
-echo "Done. Set non-secret vars in wrangler.jsonc or the Cloudflare dashboard."
-echo "Add Turnstile hostnames for *.workers.dev and time-restricted.com."
+echo "Done."
+echo "Add Turnstile hostnames for *.workers.dev and time-restricted.com in the Turnstile dashboard."
