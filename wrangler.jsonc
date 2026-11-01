@@ -42,6 +42,13 @@
     }
   ],
   "vars": {
-    "NEXTJS_ENV": "production"
+    "NEXTJS_ENV": "production",
+    "SITE_URL": "https://time-restricted.com",
+    "WORDPRESS_API_URL": "https://time-restricted.com/graphql",
+    "WORDPRESS_REDIRECTION_API_URL": "https://api.time-restricted.com/wp-json/redirection/v1/redirect",
+    "WORDPRESS_REDIRECTION_CACHE_TTL_SECONDS": "86400",
+    "SMTP_HOST": "smtp.purelymail.com",
+    "SMTP_PORT": "587",
+    "SMTP_SECURE": "false"
   }
 }

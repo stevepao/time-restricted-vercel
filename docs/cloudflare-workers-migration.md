@@ -23,54 +23,39 @@ Last updated: 2026-11-01.
 
 ## One-time Cloudflare resource setup
 
-From the repo root (Cloudflare account logged in via `npx wrangler login`):
+From the repo root:
 
 ```bash
-# R2 bucket for Next incremental cache
-npx wrangler r2 bucket create time-restricted-next-cache
-
-# D1 database for on-demand revalidation tags
-npx wrangler d1 create time-restricted-next-tag-cache
+npx wrangler login
+./scripts/cloudflare-setup.sh
 ```
 
-Copy the printed D1 `database_id` into [`wrangler.jsonc`](../wrangler.jsonc)
-(`d1_databases[0].database_id`).
-
-Initialize the revalidations table:
-
-```bash
-npx wrangler d1 execute time-restricted-next-tag-cache --remote --file=./migrations/0001_revalidations.sql
-npx wrangler d1 execute time-restricted-next-tag-cache --local --file=./migrations/0001_revalidations.sql
-```
+`cloudflare-setup.sh` creates the R2 bucket + D1 database, writes the D1
+`database_id` into [`wrangler.jsonc`](../wrangler.jsonc), and applies
+[`migrations/0001_revalidations.sql`](../migrations/0001_revalidations.sql).
 
 ---
 
 ## Secrets and vars
 
-Set production secrets (do **not** commit values):
+Sync secrets from your existing `.env.local` (copied from Vercel):
 
 ```bash
-npx wrangler secret put REVALIDATE_SECRET
-npx wrangler secret put WORDPRESS_REDIRECTION_USERNAME
-npx wrangler secret put WORDPRESS_REDIRECTION_APPLICATION_PASSWORD
-npx wrangler secret put MAILCHIMP_API_KEY
-npx wrangler secret put MAILCHIMP_TURNSTILE_SECRET_KEY
-npx wrangler secret put SMTP_PASS
-npx wrangler secret put CONTACT_TURNSTILE_SECRET_KEY
-npx wrangler secret put COMMENT_LOGIN_TURNSTILE_SECRET_KEY
-npx wrangler secret put CF_DEPLOY_HOOK_URL
+./scripts/sync-wrangler-secrets.sh
 ```
 
-Non-secret vars can live in `wrangler.jsonc` `vars` or the Cloudflare dashboard
-(Workers → Settings → Variables), matching [`.env.example`](../.env.example):
+Also set non-secret dashboard vars not already in `wrangler.jsonc` `vars`:
 
-- `WORDPRESS_API_URL`, `SITE_URL`, `NEXT_PUBLIC_SITE_URL`
-- `WORDPRESS_REDIRECTION_API_URL`, `WORDPRESS_REDIRECTION_CACHE_TTL_SECONDS`
-- `MAILCHIMP_LIST_ID`, Turnstile **site** keys (`NEXT_PUBLIC_*`)
-- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_FROM`, `CONTACT_TO`, `SMTP_SECURE`
+- `SMTP_USER`, `SMTP_FROM`, `CONTACT_TO`
+- `MAILCHIMP_LIST_ID`
+- Turnstile **site** keys (`NEXT_PUBLIC_*`)
+- `NEXT_PUBLIC_SITE_URL` (optional; falls back to `SITE_URL`)
 
 For local Workers preview, put the same keys in `.dev.vars` (gitignored). Use
 [`.dev.vars.example`](../.dev.vars.example) as a checklist.
+
+Note: `wrangler.jsonc` defaults SMTP to PurelyMail on port `587` (STARTTLS),
+matching this project's Vercel `.env.local`.
 
 ### Cloudflare Deploy Hook
 
