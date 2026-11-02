@@ -1,5 +1,10 @@
 # Vercel CPU And Runtime Cost Control
 
+> **Historical.** Production left Vercel for Cloudflare Workers in Nov 2026.
+> Keep this file for why `dynamicParams = false` and related CPU choices exist.
+> Current hosting: [`cloudflare-workers-migration.md`](./cloudflare-workers-migration.md).
+> Live publish workflow: [`cms-publish-and-cpu-optimizations.md`](./cms-publish-and-cpu-optimizations.md).
+
 Low-traffic headless sites can still show high Vercel fluid active CPU if each page
 view triggers multiple serverless invocations, proxy work, and uncached dynamic
 renders. Treat this as an ongoing optimization pass after launch, not a launch
@@ -8,7 +13,7 @@ blocker.
 This document records cost-control patterns from another headless WordPress project
 and evaluates whether each applies to **time-restricted.com** (`time-restricted-vercel`).
 
-Last reviewed: 2026-07-10.
+Last reviewed: 2026-07-10 (Vercel era; hosting cutover 2026-11-01).
 
 **Status key**
 

@@ -1,5 +1,11 @@
 # Headless WordPress Migration Plan
 
+> **Note:** This plan covers the original WordPress → Next.js frontend move.
+> Hosting later moved from Vercel to Cloudflare Workers — see
+> [`cloudflare-workers-migration.md`](./cloudflare-workers-migration.md). Some
+> deploy-hook / env examples below still say “Vercel”; treat those as the
+> historical pattern (now `CF_DEPLOY_HOOK_URL` on Workers).
+
 This document summarizes the work that went into migrating this site from a
 WordPress-rendered frontend to a small Next.js App Router frontend. It is meant
 as a repeatable plan for another WordPress site of similar scope.

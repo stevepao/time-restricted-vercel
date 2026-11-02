@@ -1,128 +1,148 @@
-# Cloudflare Workers Migration
+# Cloudflare Workers Hosting
 
-Cutover guide for moving **time-restricted.com** from Vercel to Cloudflare
-Workers with `@opennextjs/cloudflare`, while keeping `main` / Vercel production
-untouched until DNS flips.
+**Status (2026-11-01): cutover complete.** Production for
+`time-restricted.com` runs on Cloudflare Workers via
+`@opennextjs/cloudflare`. The Vercel Git integration was disconnected; the
+Vercel project may still exist until you delete it after DNS is fully settled.
 
-Work happens on the `cloudflare-migration` branch.
-
-Last updated: 2026-11-01.
+This doc is the post-migration record: what we run, how it was set up, and what
+future-you still needs to know. Day-to-day publishing details live in
+[`cms-publish-and-cpu-optimizations.md`](./cms-publish-and-cpu-optimizations.md).
+The older [`vercel-cpu-cost-control.md`](./vercel-cpu-cost-control.md) is
+historical (pre-migration Vercel era).
 
 ---
 
-## Architecture
+## Current architecture
 
 - **Runtime:** Cloudflare Workers + OpenNext (`@opennextjs/cloudflare`)
+- **Worker name:** `time-restricted` (`wrangler.jsonc`)
 - **Cache:** R2 incremental cache + Durable Object queue + D1 tag cache
-- **Contact email:** `@workermailer/smtp` on Workers (same SMTP → SPF/DKIM unchanged);
-  Nodemailer for local `next dev` and any remaining Vercel deploys
+- **Contact email:** `@workermailer/smtp` on Workers (same SMTP → SPF/DKIM
+  unchanged); Nodemailer only for local `next dev`
 - **New posts:** `dynamicParams = false` + Cloudflare Deploy Hook
-  (`CF_DEPLOY_HOOK_URL`) so first publish rebuilds static slug list
+  (`CF_DEPLOY_HOOK_URL`) so first publish rebuilds the static slug list
+- **Code deploys:** Workers Builds on `git push origin main` (OpenNext build +
+  deploy). Content-only new slugs use the Deploy Hook, not a git push.
 
 ---
 
-## One-time Cloudflare resource setup
+## What already happened (do not re-do blindly)
 
-From the repo root:
+1. Created R2 + D1 + DO bindings; real D1 `database_id` is in `wrangler.jsonc`
+2. Deployed OpenNext Worker; bound custom domain `time-restricted.com`
+3. Synced runtime secrets with `scripts/sync-wrangler-secrets.sh`
+4. Added Turnstile hostnames for prod (and preview `*.workers.dev` as needed)
+5. Connected GitHub → Workers Builds; production branch `main`
+6. Created Deploy Hook; stored as Worker secret `CF_DEPLOY_HOOK_URL`
+7. Merged `cloudflare-migration` → `main`; disconnected Vercel Git
+8. Optional leftover: delete/disable the Vercel project when traffic is gone
+
+Branch `cloudflare-migration` is historical; **`main` is the source of truth.**
+
+---
+
+## Day-to-day commands
+
+```bash
+npm run preview   # OpenNext build + local Workers runtime
+npm run deploy    # OpenNext build + deploy to Cloudflare (manual)
+```
+
+Prefer git push to `main` once Workers Builds is healthy. If you deploy with
+Wrangler/OpenNext CLI, use keep-vars so dashboard secrets survive:
+
+```bash
+npx @opennextjs/cloudflare deploy -- --keep-vars
+```
+
+### Workers Builds settings (reference)
+
+| Field | Value |
+|-------|--------|
+| Build command | `npx @opennextjs/cloudflare build` |
+| Deploy command | `npx @opennextjs/cloudflare deploy -- --keep-vars` |
+| Preview command | `npx wrangler preview` |
+
+**Build variables** (CI only — needed for SSG / `NEXT_PUBLIC_*` inlining):
+
+- `WORDPRESS_API_URL`, `SITE_URL`
+- `NEXT_PUBLIC_MAILCHIMP_TURNSTILE_SITE_KEY`
+- `NEXT_PUBLIC_CONTACT_TURNSTILE_SITE_KEY`
+- `NEXT_PUBLIC_COMMENT_LOGIN_TURNSTILE_SITE_KEY`
+
+**Runtime secrets** stay on the Worker (not only in Build vars): SMTP,
+Mailchimp API key, Turnstile secrets, `REVALIDATE_SECRET`,
+`CF_DEPLOY_HOOK_URL`, redirection credentials, etc.
+
+---
+
+## Re-running one-time setup (only if recreating resources)
 
 ```bash
 npx wrangler login
 ./scripts/cloudflare-setup.sh
+./scripts/sync-wrangler-secrets.sh
 ```
 
 `cloudflare-setup.sh` creates the R2 bucket + D1 database, writes the D1
 `database_id` into [`wrangler.jsonc`](../wrangler.jsonc), and applies
 [`migrations/0001_revalidations.sql`](../migrations/0001_revalidations.sql).
 
----
+Local Workers preview: copy [`.dev.vars.example`](../.dev.vars.example) →
+`.dev.vars` (gitignored).
 
-## Secrets and vars
+### Deploy Hook (already configured; recreate if lost)
 
-Sync secrets from your existing `.env.local` (copied from Vercel):
+1. Workers → **time-restricted** → Settings → Builds → **Deploy Hooks**
+2. Hook for production branch `main`
+3. `npx wrangler secret put CF_DEPLOY_HOOK_URL` (paste the hook URL)
 
-```bash
-./scripts/sync-wrangler-secrets.sh
-```
+Code still accepts legacy `VERCEL_DEPLOY_HOOK_URL` / `DEPLOY_HOOK_URL` if set;
+prefer `CF_DEPLOY_HOOK_URL` only.
 
-Also set non-secret dashboard vars not already in `wrangler.jsonc` `vars`:
+### Turnstile hostnames
 
-- `SMTP_USER`, `SMTP_FROM`, `CONTACT_TO`
-- `MAILCHIMP_LIST_ID`
-- Turnstile **site** keys (`NEXT_PUBLIC_*`)
-- `NEXT_PUBLIC_SITE_URL` (optional; falls back to `SITE_URL`)
+For each widget (Mailchimp, contact, comment login):
 
-For local Workers preview, put the same keys in `.dev.vars` (gitignored). Use
-[`.dev.vars.example`](../.dev.vars.example) as a checklist.
-
-Note: `wrangler.jsonc` defaults SMTP to PurelyMail on port `587` (STARTTLS),
-matching this project's Vercel `.env.local`.
-
-### Cloudflare Deploy Hook
-
-1. Cloudflare Dashboard → Workers & Pages → **time-restricted** → Settings →
-   Build → **Deploy Hooks** (or Workers Builds deploy hooks for the connected repo)
-2. Create a hook for the production branch
-3. Store the URL as secret `CF_DEPLOY_HOOK_URL`
-
-During migration, `VERCEL_DEPLOY_HOOK_URL` remains a supported fallback in code.
+- Production: `time-restricted.com` (and `www` if used)
+- Preview: `*.workers.dev` subdomain if you still smoke-test there
 
 ---
 
-## Turnstile hostnames
+## Smoke checklist (production)
 
-In Cloudflare Turnstile, add allowed hostnames for each widget
-(mailchimp signup, contact, comment login):
-
-- Production: `time-restricted.com`, `www.time-restricted.com` (if used)
-- Preview: your `*.workers.dev` subdomain after first deploy
-
-Until preview hostnames are added, Turnstile widgets fail on the Workers URL.
-
----
-
-## Build and preview
-
-```bash
-npm run preview   # OpenNext build + local Workers runtime
-npm run deploy    # OpenNext build + deploy to Cloudflare
-```
-
-Keep WordPress webhooks pointed at **Vercel** until DNS cutover.
-
----
-
-## Private-window smoke checklist (preview URL)
+Use when debugging regressions:
 
 - [ ] `/`, `/all-posts`, an existing `/blog/{slug}`, `/contact`, `/privacy-policy`
 - [ ] Legacy redirects (`/home`, dated post URLs) and `/wp-content/uploads/*`
-- [ ] Contact form send (real SMTP via workermailer)
+- [ ] Contact form (WorkerMailer / SMTP)
 - [ ] Mailchimp subscribe + Turnstile
-- [ ] Comment login cookie + post comment
+- [ ] Comment login + post comment
 - [ ] `POST /api/revalidate?token=…` for an existing slug → HTML refreshes
-- [ ] First-publish payload → `deploy.triggered: true` → after rebuild, new slug 200
+- [ ] New publish → `deploy.triggered: true` → after rebuild, new slug 200
 - [ ] `/feed.xml`, `/sitemap.xml`
 
----
+WordPress revalidation webhook should target:
 
-## DNS cutover and Vercel teardown
-
-DNS/registrar is already on Cloudflare. Cutover is Worker custom domain binding:
-
-1. Workers → **time-restricted** → Custom Domains → add `time-restricted.com`
-   (and `www` if needed)
-2. Private-window smoke on production hostname
-3. Point WordPress webhook at `https://time-restricted.com/api/revalidate?token=…`
-4. **Disconnect Vercel Git** so `main` pushes no longer redeploy Vercel
-5. Merge `cloudflare-migration` → `main`
-6. Delete/disable the Vercel project when traffic is gone
+`https://time-restricted.com/api/revalidate?token=…`
 
 ---
 
-## Free-tier notes
+## Pricing / limits notes
 
-- Account-wide Workers Free: 100k requests/day (shared with other Workers such as
-  hillwork)
-- 10 ms CPU/request on Free may be tight for Next RSC; validate on preview
-- Build minutes are ample for infrequent new-post rebuilds
+- Workers Paid was needed in practice (Free ~10 ms CPU/request is tight for Next)
+- Account-wide request limits are shared with other Workers on the account
+- Build minutes are fine for infrequent new-post rebuilds
 
-See also [`cms-publish-and-cpu-optimizations.md`](./cms-publish-and-cpu-optimizations.md).
+---
+
+## Lessons worth remembering
+
+- Wrong GraphQL host → HTML parsed as JSON; use `https://api.…/graphql`
+- Placeholder D1 id fails at runtime; use the real UUID from `wrangler d1 create`
+- Nodemailer does not run on Workers; use `@workermailer/smtp` + address parsing
+- `patch-package` keeps `cloudflare:sockets` external for SMTP
+- Build vars ≠ runtime secrets; `NEXT_PUBLIC_*` must be present at **build** time
+- Trash/delete does not fire the deploy hook; site stays fine (stale slug until
+  next rebuild at worst)

@@ -4,8 +4,9 @@ This document describes the CPU optimizations applied to
 **time-restricted.com**, how publishing from WordPress refreshes the frontend,
 and how to configure automatic deploys for new post slugs.
 
-Hosting target: **Cloudflare Workers** (OpenNext). See
-[`cloudflare-workers-migration.md`](./cloudflare-workers-migration.md).
+Hosting target: **Cloudflare Workers** (OpenNext). Cutover is done — see
+[`cloudflare-workers-migration.md`](./cloudflare-workers-migration.md) for the
+current hosting record (not a pending runbook).
 
 Last updated: 2026-11-01.
 
@@ -145,7 +146,8 @@ flowchart TD
 npx wrangler secret put CF_DEPLOY_HOOK_URL
 ```
 
-During migration, `VERCEL_DEPLOY_HOOK_URL` remains a code fallback if set.
+Legacy `VERCEL_DEPLOY_HOOK_URL` / `DEPLOY_HOOK_URL` still work in code if set;
+prefer `CF_DEPLOY_HOOK_URL` only.
 
 The hook URL is a secret — treat it like a password. Do not commit it to Git.
 
@@ -242,7 +244,7 @@ If `CF_DEPLOY_HOOK_URL` (and fallbacks) are unset, `deploy.triggered` is `false`
 |----------|----------|---------|
 | `REVALIDATE_SECRET` | Yes | Authenticates webhook requests |
 | `CF_DEPLOY_HOOK_URL` | Recommended | Triggers production rebuild for new slugs |
-| `VERCEL_DEPLOY_HOOK_URL` | Migration fallback | Legacy Vercel hook name still accepted |
+| `VERCEL_DEPLOY_HOOK_URL` | Legacy only | Old Vercel hook name still accepted if set |
 | `WORDPRESS_REDIRECTION_CACHE_TTL_SECONDS` | Optional | Default `86400` in code |
 
 ---
@@ -254,7 +256,7 @@ After configuration:
 1. **Edit an existing post** in WordPress → page updates without a full rebuild
 2. **Publish a new post** → webhook response shows `deploy.triggered: true`
 3. **Wait for Cloudflare deploy** → new `/blog/{slug}` returns 200 (not 404)
-4. **Check Workers analytics** → request/CPU usage after cutover
+4. **Check Workers analytics** → request/CPU usage
 
 ---
 
@@ -276,5 +278,5 @@ After configuration:
 | `app/api/revalidate/route.ts` | Webhook entry point |
 | `lib/deploy-hook.ts` | Deploy hook trigger logic |
 | `app/blog/[slug]/page.tsx` | Static slug generation |
-| `docs/cloudflare-workers-migration.md` | Workers cutover runbook |
+| `docs/cloudflare-workers-migration.md` | Post-cutover Workers hosting record |
 | `docs/vercel-cpu-cost-control.md` | Full CPU audit and applicability matrix |

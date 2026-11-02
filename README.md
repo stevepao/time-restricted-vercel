@@ -125,7 +125,7 @@ WordPress account login and comments use the origin derived from `WORDPRESS_API_
 
 Deploy with `npm run deploy` (OpenNext → Cloudflare Workers). Wrangler config lives in `wrangler.jsonc`.
 
-See [`docs/cloudflare-workers-migration.md`](docs/cloudflare-workers-migration.md) for R2/D1 setup, secrets, Turnstile hostnames, and the cutover notes from the Vercel migration.
+See [`docs/cloudflare-workers-migration.md`](docs/cloudflare-workers-migration.md) for the post-cutover Workers hosting record (R2/D1, secrets, Builds, deploy hook).
 
 See [`docs/cms-publish-and-cpu-optimizations.md`](docs/cms-publish-and-cpu-optimizations.md)
 for the WordPress webhook + deploy hook workflow, how this differs from the usual
